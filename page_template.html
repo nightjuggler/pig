@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>%(title)s (%(date)s) %(number)s</title>
+<style>
+body {
+	background-color: white;
+	font-family: verdana;
+	font-size: 10pt;
+	text-align: center;
+}
+.caption {
+	margin-left: auto;
+	margin-right: auto;
+	width: %(width)upx;
+}
+.smaller {
+	font-size: 8pt;
+}
+img {
+	border: 4px solid black;
+}
+a {text-decoration: none;}
+</style>
+</head>
+<body>
+
+<b><a href="%(index_page)s">%(title)s</a> (%(date)s)</b>
+<p><a href="%(next_page)s#c"><img id="c" src="%(dir)s/%(name)s" width="%(width)u" height="%(height)u"></a></p>
+%(caption)s<p>%(left_arrow)s%(number)s%(right_arrow)s</p>
+<p class="smaller">(%(name)s, %(original_info)s)</p>
+
+</body>
+</html>

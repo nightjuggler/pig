@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cropper</title>
+<style>
+body {
+	background-color: white;
+	font-family: verdana;
+	font-size: 10pt;
+}
+input, select {
+	font-family: verdana;
+	font-size: 10pt;
+	margin-top: 2px;
+	margin-bottom: 2px;
+}
+#controlDiv {
+	background-color: rgba(230,230,250,0.8);
+	border: 2px solid black;
+	border-radius: 10px;
+	text-align: center;
+	width: 520px;
+	padding: 2px;
+	position: absolute;
+	left: 100px;
+	top: 500px;
+}
+#photoDiv {
+	position: relative;
+	overflow: hidden;
+	width: 600px;
+	height: 400px;
+	border: 4px solid black;
+}
+#photo {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 600px;
+	height: 400px;
+}
+#cropper {
+	position: absolute;
+	width: 596px; /* 600 with the border */
+	height: 396px; /* 400 with the border */
+	top: 100px;
+	left: 100px;
+	border: 2px dashed black;
+	cursor: move;
+}
+#resizeNW {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	top: -10px;
+	left: -10px;
+	cursor: nw-resize;
+}
+#resizeNE {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	top: -10px;
+	right: -10px;
+	cursor: ne-resize;
+}
+#resizeSW {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	bottom: -10px;
+	left: -10px;
+	cursor: sw-resize;
+}
+#resizeSE {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	bottom: -10px;
+	right: -10px;
+	cursor: se-resize;
+}
+a {
+	text-decoration: none;
+}
+</style>
+<script src="cropList.js"></script>
+<script>
+var originalWidth;
+var originalHeight;
+var aspectX;
+var aspectY;
+var startX;
+var startY;
+var multiplyX;
+var multiplyY;
+var rotateAngle;
+var photoLeft;
+var photoTop;
+var cropInverseAspectRatio;
+var cropped = false;
+var minWidth;
+var maxWidth;
+var minHeight;
+var maxHeight;
+
+var photo;
+var cropper;
+var photoMinX;
+var photoMinY;
+var photoMaxX;
+var photoMaxY;
+var divWidth;
+var divHeight;
+var cropXField;
+var cropYField;
+var cropWidthField;
+var cropHeightField;
+var cropWidth;
+var cropHeight;
+var photoScale;
+var cropperLeft;
+var cropperTop;
+var cropperWidth;
+var cropperHeight;
+var controlDiv;
+
+function releaseElement()
+{
+	document.onmousemove = null;
+	document.onmouseup = null;
+}
+function photoDrag(event)
+{
+	var x = startX + event.clientX;
+	var y = startY + event.clientY;
+
+	var scaleX = divWidth / cropWidth;
+	var scaleY = divHeight / cropHeight;
+
+	var dW = (originalWidth - cropWidth) * scaleX;
+	var dH = (originalHeight - cropHeight) * scaleY;
+
+	var photoMinLeft = -dW;
+	var photoMaxLeft = 0;
+	var photoMinTop = -dH;
+	var photoMaxTop = 0;
+
+	if (rotateAngle === 90) {
+		photoMinLeft = 0;
+		photoMaxLeft = dH;
+		photoMinTop = -dW;
+		photoMaxTop = 0;
+	} else if (rotateAngle === 180) {
+		photoMinLeft = 0;
+		photoMaxLeft = dW;
+		photoMinTop = 0;
+		photoMaxTop = dH;
+	} else if (rotateAngle === 270) {
+		photoMinLeft = -dH;
+		photoMaxLeft = 0;
+		photoMinTop = 0;
+		photoMaxTop = dW;
+	}
+
+	if (x > photoMaxLeft) x = photoMaxLeft;
+	else if (x < photoMinLeft) x = photoMinLeft;
+	if (y > photoMaxTop) y = photoMaxTop;
+	else if (y < photoMinTop) y = photoMinTop;
+
+	photo.style.left = x + 'px';
+	photo.style.top = y + 'px';
+
+	var x2 = Math.round(x / scaleX);
+	var y2 = Math.round(y / scaleY);
+	if (rotateAngle === 0) {
+		photoLeft = x;
+		photoTop = y;
+		cropXField.value = -x2;
+		cropYField.value = -y2;
+	} else if (rotateAngle === 90) {
+		photoLeft = y;
+		photoTop = -x;
+		cropXField.value = -y2;
+		cropYField.value = x2;
+	} else if (rotateAngle === 180) {
+		photoLeft = -x;
+		photoTop = -y;
+		cropXField.value = x2;
+		cropYField.value = y2;
+	} else if (rotateAngle === 270) {
+		photoLeft = -y;
+		photoTop = x;
+		cropXField.value = y2;
+		cropYField.value = -x2;
+	}
+
+	return false;
+}
+function startPhotoDrag(event)
+{
+	startX = photo.offsetLeft - event.clientX;
+	startY = photo.offsetTop - event.clientY;
+	document.onmousemove = photoDrag;
+	document.onmouseup = releaseElement;
+	return false;
+}
+function cropperDrag(event)
+{
+	var x = startX + event.clientX;
+	var y = startY + event.clientY;
+	if (x < photoMinX) x = photoMinX;
+	if (y < photoMinY) y = photoMinY;
+	var x2 = Math.round((x - photoMinX) * photoScale);
+	var y2 = Math.round((y - photoMinY) * photoScale);
+	var dW = originalWidth - cropWidth;
+	var dH = originalHeight - cropHeight;
+	if (rotateAngle === 0) {
+		if (x2 > dW) x2 = dW;
+		if (y2 > dH) y2 = dH;
+		cropXField.value = x2;
+		cropYField.value = y2;
+	} else if (rotateAngle === 90) {
+		if (x2 > dH) x2 = dH;
+		if (y2 > dW) y2 = dW;
+		cropXField.value = y2;
+		cropYField.value = dH - x2;
+	} else if (rotateAngle === 180) {
+		if (x2 > dW) x2 = dW;
+		if (y2 > dH) y2 = dH;
+		cropXField.value = dW - x2;
+		cropYField.value = dH - y2;
+	} else if (rotateAngle === 270) {
+		if (x2 > dH) x2 = dH;
+		if (y2 > dW) y2 = dW;
+		cropXField.value = dW - y2;
+		cropYField.value = x2;
+	}
+	if (x + cropperWidth > photoMaxX) x = photoMaxX - cropperWidth;
+	if (y + cropperHeight > photoMaxY) y = photoMaxY - cropperHeight;
+	cropper.style.left = (cropperLeft = x) + 'px';
+	cropper.style.top = (cropperTop = y) + 'px';
+	return false;
+}
+function startCropperDrag(event)
+{
+	startX = cropperLeft - event.clientX;
+	startY = cropperTop - event.clientY;
+	document.onmousemove = cropperDrag;
+	document.onmouseup = releaseElement;
+	return false;
+}
+function dragResize(event)
+{
+	var dX = (event.clientX - startX) * multiplyX;
+	var dY = (event.clientY - startY) * multiplyY;
+	var absdX = Math.abs(dX);
+	var absdY = Math.abs(dY);
+	if (absdX < 2 && absdY < 2)
+		return false;
+	startX = event.clientX;
+	startY = event.clientY;
+	if (dX * dY <= 0)
+		return false;
+	var cropperDimension;
+	var setCropDimension;
+	if (absdX > absdY) {
+		cropperDimension = cropperWidth - dX - dX;
+		setCropDimension = (rotateAngle === 0 || rotateAngle === 180) ? setCropWidth : setCropHeight;
+	} else {
+		cropperDimension = cropperHeight - dY - dY;
+		setCropDimension = (rotateAngle === 0 || rotateAngle === 180) ? setCropHeight : setCropWidth;
+	}
+	setCropDimension(Math.round(cropperDimension * photoScale));
+	return false;
+}
+function startDragResize(event)
+{
+	event.cancelBubble = true;
+	if (event.stopPropagation) event.stopPropagation();
+	startX = event.clientX;
+	startY = event.clientY;
+	document.onmousemove = dragResize;
+	document.onmouseup = releaseElement;
+	return false;
+}
+function startDragResizeNW(event)
+{
+	multiplyX = 1;
+	multiplyY = 1;
+	return startDragResize(event);
+}
+function startDragResizeNE(event)
+{
+	multiplyX = -1;
+	multiplyY = 1;
+	return startDragResize(event);
+}
+function startDragResizeSE(event)
+{
+	multiplyX = -1;
+	multiplyY = -1;
+	return startDragResize(event);
+}
+function startDragResizeSW(event)
+{
+	multiplyX = 1;
+	multiplyY = -1;
+	return startDragResize(event);
+}
+function greatestCommonDivisor(a, b)
+{
+	while (b !== 0)
+	{
+		var remainder = a % b;
+		a = b;
+		b = remainder;
+	}
+	return a;
+}
+function setDisplayArea()
+{
+	var width = document.getElementById("divWidth").value;
+	var height = document.getElementById("divHeight").value;
+
+	if (originalWidth > originalHeight && width > height ||
+		originalWidth < originalHeight && width < height)
+	{
+		divWidth = width;
+		divHeight = height;
+	} else {
+		divWidth = height;
+		divHeight = width;
+	}
+
+	photoLeft = 0;
+	photoTop = 0;
+	photo.style.left = '0px';
+	photo.style.top = '0px';
+	photo.style.width = divWidth + 'px';
+	photo.style.height = divHeight + 'px';
+	photo.style.webkitTransform = null;
+	photo.style.transform = null;
+	photo.style.cursor = 'default';
+	photo.onmousedown = preventDefault;
+
+	var photoDiv = document.getElementById("photoDiv");
+	photoDiv.style.width = divWidth + 'px';
+	photoDiv.style.height = divHeight + 'px';
+	photoMinX = photoDiv.offsetLeft + 4;
+	photoMinY = photoDiv.offsetTop + 4;
+	photoMaxX = photoDiv.offsetLeft + photoDiv.offsetWidth - 4;
+	photoMaxY = photoDiv.offsetTop + photoDiv.offsetHeight - 4;
+
+	photoScale = originalWidth / divWidth;
+	rotateAngle = 0;
+	minWidth = divWidth;
+	maxWidth = originalWidth;
+	minHeight = divHeight;
+	maxHeight = originalHeight;
+}
+function init()
+{
+	var gcd = greatestCommonDivisor(originalWidth, originalHeight);
+	aspectX = originalWidth / gcd;
+	aspectY = originalHeight / gcd;
+	cropInverseAspectRatio = false;
+
+	setDisplayArea();
+	setInverseAspectRatioAbility();
+
+	cropWidthField = document.getElementById("cropWidthField");
+	cropHeightField = document.getElementById("cropHeightField");
+	cropWidthField.value = cropWidth = originalWidth / 2;
+	cropHeightField.value = cropHeight = originalHeight / 2;
+
+	cropXField = document.getElementById("cropXField");
+	cropYField = document.getElementById("cropYField");
+	cropXField.value = originalWidth / 4;
+	cropYField.value = originalHeight / 4;
+
+	cropper = document.getElementById("cropper");
+	setCropperXY();
+	cropperWidth = cropWidth / photoScale;
+	cropperHeight = cropHeight / photoScale;
+	cropper.style.width = (cropperWidth - 4) + 'px';
+	cropper.style.height = (cropperHeight - 4) + 'px';
+	cropper.onmousedown = startCropperDrag;
+
+	document.getElementById("resizeNW").onmousedown = startDragResizeNW;
+	document.getElementById("resizeNE").onmousedown = startDragResizeNE;
+	document.getElementById("resizeSW").onmousedown = startDragResizeSW;
+	document.getElementById("resizeSE").onmousedown = startDragResizeSE;
+
+	controlDiv = document.getElementById("controlDiv");
+	controlDiv.onmousedown = startControlDivDrag;
+
+	if (document.getElementById("inverseAspectRatioCheckbox").checked)
+		toggleInverseAspectRatio();
+}
+function setCropWidthAndHeight(width, height)
+{
+	var x = +cropXField.value + Math.floor(cropWidth / 2 - width / 2);
+	var y = +cropYField.value + Math.floor(cropHeight / 2 - height / 2);
+
+	if (x + width > originalWidth)
+		x = originalWidth - width;
+	else if (x < 0)
+		x = 0;
+	if (y + height > originalHeight)
+		y = originalHeight - height;
+	else if (y < 0)
+		y = 0;
+
+	cropXField.value = x;
+	cropYField.value = y;
+	cropWidthField.value = width;
+	cropHeightField.value = height;
+	cropWidth = width;
+	cropHeight = height;
+
+	width = Math.round(width / photoScale);
+	height = Math.round(height / photoScale);
+	if (rotateAngle === 0 || rotateAngle === 180) {
+		cropperWidth = width;
+		cropperHeight = height;
+	} else {
+		cropperWidth = height;
+		cropperHeight = width;
+	}
+	cropper.style.width = (cropperWidth - 4) + 'px';
+	cropper.style.height = (cropperHeight - 4) + 'px';
+	setCropperXY();
+}
+function setCropWidth(width)
+{
+	if (width > maxWidth)
+		width = maxWidth;
+	else if (width < minWidth || isNaN(width))
+		width = minWidth;
+
+	width -= width % aspectX;
+	setCropWidthAndHeight(width, width / aspectX * aspectY);
+}
+function setCropHeight(height)
+{
+	if (height > maxHeight)
+		height = maxHeight;
+	else if (height < minHeight || isNaN(height))
+		height = minHeight;
+
+	height -= height % aspectY;
+	setCropWidthAndHeight(height / aspectY * aspectX, height);
+}
+function changeCropWidth()
+{
+	setCropWidth(+cropWidthField.value);
+	if (cropped) crop();
+}
+function changeCropHeight()
+{
+	setCropHeight(+cropHeightField.value);
+	if (cropped) crop();
+}
+function changeCropX()
+{
+	var x = +cropXField.value;
+
+	if (x + cropWidth > originalWidth)
+		x = originalWidth - cropWidth;
+	else if (x < 0 || isNaN(x))
+		x = 0;
+
+	cropXField.value = x;
+	setCropperXY();
+	if (cropped) {
+		photoLeft = -x * divWidth / cropWidth;
+		if (rotateAngle === 0)
+			photo.style.left = photoLeft + 'px';
+		else if (rotateAngle === 90)
+			photo.style.top = photoLeft + 'px';
+		else if (rotateAngle === 180)
+			photo.style.left = -photoLeft + 'px';
+		else if (rotateAngle === 270)
+			photo.style.top = -photoLeft + 'px';
+		setSpecParam();
+	}
+}
+function changeCropY()
+{
+	var y = +cropYField.value;
+
+	if (y + cropHeight > originalHeight)
+		y = originalHeight - cropHeight;
+	else if (y < 0 || isNaN(y))
+		y = 0;
+
+	cropYField.value = y;
+	setCropperXY();
+	if (cropped) {
+		photoTop = -y * divHeight / cropHeight;
+		if (rotateAngle === 0)
+			photo.style.top = photoTop + 'px';
+		else if (rotateAngle === 90)
+			photo.style.left = -photoTop + 'px';
+		else if (rotateAngle === 180)
+			photo.style.top = -photoTop + 'px';
+		else if (rotateAngle === 270)
+			photo.style.left = photoTop + 'px';
+		setSpecParam();
+	}
+}
+function setSpecParam()
+{
+	document.getElementById("specParam").value = "('"
+		+ document.getElementById("fileNameField").value + "', '"
+		+ cropWidth + "x" + cropHeight + "+"
+		+ cropXField.value + "+" + cropYField.value + "')";
+}
+function crop()
+{
+	if (cropInverseAspectRatio && !cropped) {
+		turnPhotoDiv();
+		var width = divWidth;
+		var height = divHeight;
+		divWidth = height;
+		divHeight = width;
+	}
+
+	var scaleX = divWidth / cropWidth;
+	var scaleY = divHeight / cropHeight;
+
+	photoLeft = -cropXField.value * scaleX;
+	photoTop = -cropYField.value * scaleY;
+	photo.style.width = (originalWidth * scaleX) + 'px';
+	photo.style.height = (originalHeight * scaleY) + 'px';
+
+	transformPhoto();
+	setSpecParam();
+
+	cropped = true;
+	cropper.style.display = 'none';
+	photo.onmousedown = startPhotoDrag;
+	photo.style.cursor = 'move';
+}
+function undo()
+{
+	if (cropInverseAspectRatio && cropped) {
+		turnPhotoDiv();
+		var width = divWidth;
+		var height = divHeight;
+		divWidth = height;
+		divHeight = width;
+	}
+
+	photoLeft = 0;
+	photoTop = 0;
+	photo.style.width = divWidth + 'px';
+	photo.style.height = divHeight + 'px';
+
+	transformPhoto();
+	setCropperXY();
+
+	photo.onmousedown = preventDefault;
+	photo.style.cursor = 'default';
+	cropper.style.display = 'block';
+	cropped = false;
+}
+function transformPhoto()
+{
+	var transform = null;
+	var delta = (photo.offsetWidth - photo.offsetHeight) / 2;
+	var dX = 0;
+	var dY = 0;
+	var left = photoLeft;
+	var top = photoTop;
+
+	if (rotateAngle === 90) {
+		dX = delta;
+		dY = delta + photo.offsetHeight - divHeight;
+		left = -photoTop;
+		top = photoLeft;
+	} else if (rotateAngle === 180) {
+		dX = photo.offsetWidth - divWidth;
+		dY = photo.offsetHeight - divHeight;
+		left = -photoLeft;
+		top = -photoTop;
+	} else if (rotateAngle === 270) {
+		dX = -delta + photo.offsetWidth - divWidth;
+		dY = -delta;
+		left = photoTop;
+		top = -photoLeft;
+	}
+
+	if (rotateAngle !== 0 || dX !== 0 || dY !== 0) {
+		transform = "rotate(" + rotateAngle + "deg)";
+		transform += " translate(" + dX + "px," + dY + "px)";
+	}
+	photo.style.webkitTransform = transform;
+	photo.style.transform = transform;
+	photo.style.left = left + 'px';
+	photo.style.top = top + 'px';
+}
+function setCropperXY()
+{
+	var x = Math.round(cropXField.value / photoScale);
+	var y = Math.round(cropYField.value / photoScale);
+	if (rotateAngle === 0) {
+		cropperLeft = photoMinX + x;
+		cropperTop = photoMinY + y;
+	} else if (rotateAngle === 90) {
+		cropperLeft = photoMaxX - y - cropperWidth;
+		cropperTop = photoMinY + x;
+	} else if (rotateAngle === 180) {
+		cropperLeft = photoMaxX - x - cropperWidth;
+		cropperTop = photoMaxY - y - cropperHeight;
+	} else if (rotateAngle === 270) {
+		cropperLeft = photoMinX + y;
+		cropperTop = photoMaxY - x - cropperHeight;
+	}
+	cropper.style.left = cropperLeft + 'px';
+	cropper.style.top = cropperTop + 'px';
+}
+function turnPhotoDiv()
+{
+	var photoDiv = document.getElementById("photoDiv");
+	var width = photoDiv.offsetWidth - 8;
+	var height = photoDiv.offsetHeight - 8;
+	photoDiv.style.width = height + 'px';
+	photoDiv.style.height = width + 'px';
+	photoMinX = photoDiv.offsetLeft + 4;
+	photoMinY = photoDiv.offsetTop + 4;
+	photoMaxX = photoDiv.offsetLeft + photoDiv.offsetWidth - 4;
+	photoMaxY = photoDiv.offsetTop + photoDiv.offsetHeight - 4;
+}
+function rotatePhoto(angle)
+{
+	rotateAngle = (rotateAngle + angle) % 360;
+	transformPhoto();
+	var oldCropperLeft = cropperLeft - photoMinX;
+	var oldCropperTop = cropperTop - photoMinY;
+	if (angle === 90 || angle === 270) {
+		turnPhotoDiv();
+		var width = cropperWidth;
+		var height = cropperHeight;
+		cropperWidth = height;
+		cropperHeight = width;
+		cropper.style.width = (cropperWidth - 4) + 'px';
+		cropper.style.height = (cropperHeight - 4) + 'px';
+	}
+	if (angle === 90) {
+		cropperLeft = photoMaxX - oldCropperTop - cropperWidth;
+		cropperTop = photoMinY + oldCropperLeft;
+	} else if (angle === 180) {
+		cropperLeft = photoMaxX - oldCropperLeft - cropperWidth;
+		cropperTop = photoMaxY - oldCropperTop - cropperHeight;
+	} else if (angle === 270) {
+		cropperLeft = photoMinX + oldCropperTop;
+		cropperTop = photoMaxY - oldCropperLeft - cropperHeight;
+	}
+	cropper.style.left = cropperLeft + 'px';
+	cropper.style.top = cropperTop + 'px';
+}
+function setInverseAspectRatioAbility()
+{
+	var checkbox = document.getElementById("inverseAspectRatioCheckbox");
+
+	if (originalWidth > originalHeight) {
+		if (divWidth > originalHeight)
+			checkbox.disabled = true;
+	} else {
+		if (divHeight > originalWidth)
+			checkbox.disabled = true;
+	}
+	if (checkbox.disabled)
+		checkbox.checked = false;
+}
+function toggleInverseAspectRatio()
+{
+	cropInverseAspectRatio = !cropInverseAspectRatio;
+
+	if (cropInverseAspectRatio) {
+		minWidth = divHeight;
+		minHeight = divWidth;
+
+		if (originalWidth > originalHeight) {
+			maxWidth = Math.floor(originalHeight / aspectX * aspectY);
+			maxHeight = originalHeight;
+		} else {
+			maxWidth = originalWidth;
+			maxHeight = Math.floor(originalWidth / aspectY * aspectX);
+		}
+	} else {
+		minWidth = divWidth;
+		maxWidth = originalWidth;
+
+		minHeight = divHeight;
+		maxHeight = originalHeight;
+	}
+
+	var x = aspectX;
+	var y = aspectY;
+	aspectX = y;
+	aspectY = x;
+
+	if (originalWidth > originalHeight)
+		setCropHeight(cropWidth);
+	else
+		setCropWidth(cropHeight);
+
+	if (cropped) {
+		turnPhotoDiv();
+		var width = divWidth;
+		var height = divHeight;
+		divWidth = height;
+		divHeight = width;
+		crop();
+	}
+}
+function controlDivDrag(event)
+{
+	controlDiv.style.left = (startX + event.clientX) + 'px';
+	controlDiv.style.top = (startY + event.clientY) + 'px';
+	return false;
+}
+function startControlDivDrag(event)
+{
+	if (event.target !== controlDiv) return true;
+	startX = controlDiv.offsetLeft - event.clientX;
+	startY = controlDiv.offsetTop - event.clientY;
+	document.onmousemove = controlDivDrag;
+	document.onmouseup = releaseElement;
+	return false;
+}
+function preventDefault(event)
+{
+	if (event.preventDefault) event.preventDefault();
+}
+function imageLoaded()
+{
+	if (cropped) undo();
+
+	photo = document.getElementById("photo");
+	photo.src = this.src;
+
+	originalWidth = this.width;
+	originalHeight = this.height;
+	init();
+}
+function loadImage()
+{
+	var fileNameField = document.getElementById("fileNameField");
+	if (fileNameField.options.length === 0)
+	{
+		for (var i = 0; i < imageNames.length; ++i)
+			fileNameField.options[i] = new Option(imageNames[i], imageNames[i], false, false);
+		fileNameField.selectedIndex = 0;
+	}
+	var prevButton = document.getElementById("prevButton");
+	var nextButton = document.getElementById("nextButton");
+	prevButton.disabled = (fileNameField.selectedIndex === 0);
+	nextButton.disabled = (fileNameField.selectedIndex === fileNameField.options.length - 1);
+	var fileName = fileNameField.options[fileNameField.selectedIndex].value;
+	var imageObject = new Image();
+	imageObject.onload = imageLoaded;
+	imageObject.src = "originals/" + fileName;
+}
+function prevImage()
+{
+	var fileNameField = document.getElementById("fileNameField");
+	if (fileNameField.selectedIndex > 0)
+		--fileNameField.selectedIndex;
+	loadImage();
+}
+function nextImage()
+{
+	var fileNameField = document.getElementById("fileNameField");
+	if (fileNameField.selectedIndex < fileNameField.options.length - 1)
+		++fileNameField.selectedIndex;
+	loadImage();
+}
+</script>
+</head>
+<body onload="loadImage()">
+
+<div id="photoDiv"><img id="photo" /></div>
+
+<div id="cropper">
+<div id="resizeNW"></div>
+<div id="resizeNE"></div>
+<div id="resizeSW"></div>
+<div id="resizeSE"></div>
+</div>
+
+<div id="controlDiv">
+Crop Area (Width x Height + X + Y): <input
+	type="text" id="cropWidthField" size="4" value="" onchange="changeCropWidth()" />x<input
+	type="text" id="cropHeightField" size="4" value="" onchange="changeCropHeight()" />+<input
+	type="text" id="cropXField" size="4" value="" onchange="changeCropX()" />+<input
+	type="text" id="cropYField" size="4" value="" onchange="changeCropY()" />
+<br>
+<input type="button" value="Crop" onclick="crop()" />
+<input type="button" value="Undo" onclick="undo()" />
+<input type="button" value="Rotate Left" onclick="rotatePhoto(270)" />
+<input type="button" value="Rotate Right" onclick="rotatePhoto(90)" />
+<input type="button" value="Rotate 180" onclick="rotatePhoto(180)" />
+<br>
+Display Width x Height: <input
+	type="text" readonly id="divWidth" size="4" value="900" />x<input
+	type="text" readonly id="divHeight" size="4" value="600" />
+<br>
+<input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
+Crop Inverse Aspect Ratio
+<br>
+Image Filename: <select id="fileNameField" onchange="loadImage()"></select>
+<input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
+<input type="button" id="nextButton" value="Next" onclick="nextImage()" />
+<br>
+<input type="text" id="specParam" size="44" value="" readonly />
+</div>
+
+</body>
+</html>
