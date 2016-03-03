@@ -1,9 +1,10 @@
 #
 # pimly.py (Pius' Image Library)
 #
+import operator
 import time
 
-__all__ = ('Image')
+__all__ = ('Image',)
 
 # Big Endian
 
@@ -24,10 +25,7 @@ def sInt4(n):
 	return n - (1 << 32) if (n >> 31) == 1 else n
 
 def escapeString(s):
-	return '\'{}\''.format(''.join(
-		[('\\' + c if c == '\\' or c == '\'' else c)
-			if 32 <= ord(c) <= 126 else '\\x{:02X}'.format(ord(c))
-			for c in s]))
+	return ''.join([c if 32 <= ord(c) <= 126 else '\\x{:02X}'.format(ord(c)) for c in s])
 
 # PNG Spec: https://www.w3.org/TR/PNG/
 
@@ -57,85 +55,123 @@ toInt2 = leInt2
 toInt4 = leInt4
 
 # Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-2012_E_C.pdf
+# (IFD = Image File Directory)
 
-exifTagName = {
-	270: 'ImageDescription',
-	271: 'Make',
-	272: 'Model',
-	274: 'Orientation',
-	282: 'XResolution',
-	283: 'YResolution',
-	296: 'ResolutionUnit',
-	305: 'Software',
-	306: 'DateTime',
-	531: 'YCbCrPositioning',
-	33434: 'ExposureTime',
-	33437: 'FNumber',
-	34850: 'ExposureProgram',
-	34855: 'PhotographicSensitivity',
-	34864: 'SensitivityType',
-	36864: 'ExifVersion',
-	36867: 'DateTimeOriginal',
-	36868: 'DateTimeDigitized',
-	37121: 'ComponentsConfiguration',
-	37122: 'CompressedBitsPerPixel',
-	37377: 'ShutterSpeedValue',
-	37378: 'ApertureValue',
-	37379: 'BrightnessValue',
-	37380: 'ExposureBiasValue',
-	37381: 'MaxApertureValue',
-	37383: 'MeteringMode',
-	37384: 'LightSource',
-	37385: 'Flash',
-	37386: 'FocalLength',
-	37500: 'MakerNote',
-	37510: 'UserComment',
-	37520: 'SubSecTime',
-	37521: 'SubSecTimeOriginal',
-	37522: 'SubSecTimeDigitized',
-	40960: 'FlashpixVersion',
-	40961: 'ColorSpace',
-	40962: 'PixelXDimension',
-	40963: 'PixelYDimension',
-	41486: 'FocalPlaneXResolution',
-	41487: 'FocalPlaneYResolution',
-	41488: 'FocalPlaneResolutionUnit',
-	41495: 'SensingMethod',
-	41728: 'FileSource',
-	41729: 'SceneType',
-	41730: 'CFAPattern',
-	41985: 'CustomRendered',
-	41986: 'ExposureMode',
-	41987: 'WhiteBalance',
-	41988: 'DigitalZoomRatio',
-	41989: 'FocalLengthIn35mmFilm',
-	41990: 'SceneCaptureType',
-	41991: 'GainControl',
-	41992: 'Contrast',
-	41993: 'Saturation',
-	41994: 'Sharpness',
-	41996: 'SubjectDistanceRange',
-	42032: 'CameraOwnerName',
-	42036: 'LensModel',
-}
+class ExifTagInfo(object):
+	def __init__(self, name, subIFD=None, toStr=None):
+		self.name = name
+		self.subIFD = subIFD
+		self.toStr = toStr
 
-# IFD = Image File Directory
+class ExifTagData(object):
+	def __init__(self, info):
+		self.name = info.name
+		self.toStr = info.toStr
+		self.valueType = None
+		self.value = None
 
-exifSubIFD = {
-	34665: 'Exif',
-	34853: 'GPS',
-	40965: 'Interoperability',
-}
+escapeValue = lambda v: escapeString(v)
+escapeStrOrd = lambda v: escapeString(str(ord(v)))
 
-def exifPrintTag(tag, type, value):
-	if type == 2:
-		value = escapeString(value)
-	elif type == 7:
-		value = '...'
-	elif type == 5 or type == 10:
-		value = '{}/{}'.format(*value)
+exifIFD0 = ExifTagInfo('IFD0', subIFD={
+	270: ExifTagInfo('ImageDescription'),
+	271: ExifTagInfo('Make'),
+	272: ExifTagInfo('Model'),
+	274: ExifTagInfo('Orientation'),
+	282: ExifTagInfo('XResolution'),
+	283: ExifTagInfo('YResolution'),
+	296: ExifTagInfo('ResolutionUnit'),
+	305: ExifTagInfo('Software'),
+	306: ExifTagInfo('DateTime'),
+	531: ExifTagInfo('YCbCrPositioning'),
 
-	print '{}: {}'.format(exifTagName.get(tag, tag), value)
+	34665: ExifTagInfo('Exif IFD', subIFD={
+		33434: ExifTagInfo('ExposureTime'),
+		33437: ExifTagInfo('FNumber'),
+		34850: ExifTagInfo('ExposureProgram'),
+		34855: ExifTagInfo('PhotographicSensitivity'),
+		34864: ExifTagInfo('SensitivityType'),
+		36864: ExifTagInfo('ExifVersion', toStr=escapeValue),
+		36867: ExifTagInfo('DateTimeOriginal'),
+		36868: ExifTagInfo('DateTimeDigitized'),
+		37121: ExifTagInfo('ComponentsConfiguration', toStr=lambda v: ' '.join([str(ord(i)) for i in v])),
+		37122: ExifTagInfo('CompressedBitsPerPixel'),
+		37377: ExifTagInfo('ShutterSpeedValue'),
+		37378: ExifTagInfo('ApertureValue'),
+		37379: ExifTagInfo('BrightnessValue'),
+		37380: ExifTagInfo('ExposureBiasValue'),
+		37381: ExifTagInfo('MaxApertureValue'),
+		37383: ExifTagInfo('MeteringMode'),
+		37384: ExifTagInfo('LightSource'),
+		37385: ExifTagInfo('Flash'),
+		37386: ExifTagInfo('FocalLength'),
+		37500: ExifTagInfo('MakerNote'),
+		37510: ExifTagInfo('UserComment'),
+		37520: ExifTagInfo('SubSecTime'),
+		37521: ExifTagInfo('SubSecTimeOriginal'),
+		37522: ExifTagInfo('SubSecTimeDigitized'),
+		40960: ExifTagInfo('FlashpixVersion', toStr=escapeValue),
+		40961: ExifTagInfo('ColorSpace'),
+		40962: ExifTagInfo('PixelXDimension'),
+		40963: ExifTagInfo('PixelYDimension'),
+		40965: ExifTagInfo('Interoperability IFD', subIFD={
+			1: ExifTagInfo('InteroperabilityIndex'),
+			2: ExifTagInfo('InteroperabilityVersion'),
+			4097: ExifTagInfo('RelatedImageWidth'),
+			4098: ExifTagInfo('RelatedImageLength'),
+		}),
+		41486: ExifTagInfo('FocalPlaneXResolution'),
+		41487: ExifTagInfo('FocalPlaneYResolution'),
+		41488: ExifTagInfo('FocalPlaneResolutionUnit'),
+		41495: ExifTagInfo('SensingMethod'),
+		41728: ExifTagInfo('FileSource', toStr=escapeStrOrd),
+		41729: ExifTagInfo('SceneType', toStr=escapeStrOrd),
+		41730: ExifTagInfo('CFAPattern'),
+		41985: ExifTagInfo('CustomRendered'),
+		41986: ExifTagInfo('ExposureMode'),
+		41987: ExifTagInfo('WhiteBalance'),
+		41988: ExifTagInfo('DigitalZoomRatio'),
+		41989: ExifTagInfo('FocalLengthIn35mmFilm'),
+		41990: ExifTagInfo('SceneCaptureType'),
+		41991: ExifTagInfo('GainControl'),
+		41992: ExifTagInfo('Contrast'),
+		41993: ExifTagInfo('Saturation'),
+		41994: ExifTagInfo('Sharpness'),
+		41996: ExifTagInfo('SubjectDistanceRange'),
+		42032: ExifTagInfo('CameraOwnerName'),
+		42036: ExifTagInfo('LensModel'),
+	}),
+	34853: ExifTagInfo('GPS IFD', subIFD={
+		0: ExifTagInfo('GPSVersionID', toStr=lambda v: '.'.join([str(i) for i in v])),
+		16: ExifTagInfo('GPSImgDirectionRef'),
+		17: ExifTagInfo('GPSImgDirection'),
+	}),
+})
+
+def exifPrintSorted(ifdData, level=0):
+	indent = '\t' * level
+
+	for tagData in sorted(ifdData.itervalues(), key=operator.attrgetter('name')):
+
+		name = tagData.name
+		value = tagData.value
+		valueType = tagData.valueType
+
+		if valueType is None:
+			print '{}{}:'.format(indent, name)
+			exifPrintSorted(value, level + 1)
+			continue
+
+		if tagData.toStr is not None:
+			value = tagData.toStr(value)
+		elif valueType == 2:
+			value = escapeString(value)
+		elif valueType == 7:
+			value = '...'
+		elif valueType == 5 or valueType == 10:
+			value = '{}/{}'.format(*value)
+
+		print '{}{}: {}'.format(indent, name, value)
 
 def exifReadByte(b, i, count, offset):
 	if count == 1:
@@ -196,30 +232,33 @@ exifReadValue = {
 	10: exifReadSignedRational,
 }
 
-def exifReadIFD(b, i):
-	exifData = {}
+def exifReadIFD(b, i, ifdInfo):
+	ifdData = {}
 
 	n = toInt2(b[i:i+2]) # Number of fields
 	i += 2
 
 	while n > 0:
 		tag = toInt2(b[i:i+2])
-		type = toInt2(b[i+2:i+4])
+		valueType = toInt2(b[i+2:i+4])
 		count = toInt4(b[i+4:i+8])
 		offset = toInt4(b[i+8:i+12])
 
 		n -= 1
 		i += 12
 
-		if tag in exifSubIFD:
-			assert type == 4 # LONG (4-byte unsigned integer)
-			assert count == 1
-			exifData[tag] = exifReadIFD(b, offset)
-		else:
-			exifData[tag] = exifReadValue[type](b, i - 4, count, offset)
-#			exifPrintTag(tag, type, exifData[tag])
+		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(str(tag)))
+		ifdData[tag] = tagData = ExifTagData(tagInfo)
 
-	return exifData
+		if tagInfo.subIFD is None:
+			tagData.valueType = valueType
+			tagData.value = exifReadValue[valueType](b, i - 4, count, offset)
+		else:
+			assert valueType == 4
+			assert count == 1
+			tagData.value = exifReadIFD(b, offset, tagInfo.subIFD)
+
+	return ifdData
 
 def exifRead(b):
 	if b[0:2] == 'II':
@@ -234,7 +273,7 @@ def exifRead(b):
 
 	ifd0_offset = toInt4(b[4:8])
 
-	return exifReadIFD(b, ifd0_offset)
+	return exifReadIFD(b, ifd0_offset, exifIFD0.subIFD)
 
 startOfFrameMarkers = (
 	0xC0, 0xC1, 0xC2, 0xC3,
@@ -311,15 +350,15 @@ class Image(object):
 		if self.exifData is None:
 			return 0
 
-		exifData = self.exifData.get(34665)
-		if exifData is None:
+		exifSubIFD = self.exifData.get(34665)
+		if exifSubIFD is None:
 			return 0
 
-		timeCreated = exifData.get(36867) # DateTimeOriginal, e.g. '2008:06:27 08:36:55'
-		if timeCreated is None:
+		tagData = exifSubIFD.value.get(36867) # DateTimeOriginal, e.g. '2008:06:27 08:36:55'
+		if tagData is None:
 			return 0
 
 		try:
-			return time.mktime(time.strptime(timeCreated, '%Y:%m:%d %H:%M:%S'))
+			return time.mktime(time.strptime(tagData.value, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:
 			return 0
