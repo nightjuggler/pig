@@ -55,7 +55,8 @@ toInt2 = leInt2
 toInt4 = leInt4
 
 # Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-2012_E_C.pdf
-# (IFD = Image File Directory)
+# DCF Spec: http://www.cipa.jp/std/documents/e/DC-009-2010_E.pdf
+# IFD = Image File Directory
 
 class ExifTagInfo(object):
 	def __init__(self, name, subIFD=None, toStr=None):
@@ -275,11 +276,14 @@ def exifRead(b):
 
 	return exifReadIFD(b, ifd0_offset, exifIFD0.subIFD)
 
+# JPEG Spec: https://www.w3.org/Graphics/JPEG/itu-t81.pdf
+
 startOfFrameMarkers = (
-	0xC0, 0xC1, 0xC2, 0xC3,
+	0xC0,
+	0xC1, 0xC2, 0xC3,
 	0xC5, 0xC6, 0xC7,
 	0xC9, 0xCA, 0xCB,
-	0xCD, 0xCE, 0xCF
+	0xCD, 0xCE, 0xCF,
 )
 
 def jpegReadSegments(f):
