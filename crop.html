@@ -105,6 +105,9 @@ a {
 	color: rgb(255,255,255);
 	cursor: pointer;
 }
+#filterDiv, #fileBrowserDiv {
+	display: none;
+}
 </style>
 <script src="cropList.js"></script>
 <script>
@@ -146,6 +149,9 @@ var cropperTop;
 var cropperWidth;
 var cropperHeight;
 var controlDiv;
+
+var imageNames;
+var imageFiles;
 
 function releaseElement()
 {
@@ -413,9 +419,6 @@ function init()
 	document.getElementById("resizeNE").onmousedown = startDragResizeNE;
 	document.getElementById("resizeSW").onmousedown = startDragResizeSW;
 	document.getElementById("resizeSE").onmousedown = startDragResizeSE;
-
-	controlDiv = document.getElementById("controlDiv");
-	controlDiv.onmousedown = startControlDivDrag;
 
 	if (document.getElementById("inverseAspectRatioCheckbox").checked)
 		toggleInverseAspectRatio();
@@ -772,6 +775,14 @@ function imageLoaded()
 }
 function loadImage()
 {
+	var prevButton = document.getElementById("prevButton");
+	var nextButton = document.getElementById("nextButton");
+	if (imageNames === undefined)
+	{
+		prevButton.disabled = true;
+		nextButton.disabled = true;
+		return;
+	}
 	var fileNameField = document.getElementById("fileNameField");
 	if (fileNameField.options.length === 0)
 	{
@@ -779,14 +790,16 @@ function loadImage()
 			fileNameField.options[i] = new Option(imageNames[i], imageNames[i], false, false);
 		fileNameField.selectedIndex = 0;
 	}
-	var prevButton = document.getElementById("prevButton");
-	var nextButton = document.getElementById("nextButton");
-	prevButton.disabled = (fileNameField.selectedIndex === 0);
-	nextButton.disabled = (fileNameField.selectedIndex === fileNameField.options.length - 1);
-	var fileName = fileNameField.options[fileNameField.selectedIndex].value;
+	var selectedIndex = fileNameField.selectedIndex;
+	prevButton.disabled = (selectedIndex === 0);
+	nextButton.disabled = (selectedIndex === fileNameField.options.length - 1);
+
 	var imageObject = new Image();
 	imageObject.onload = imageLoaded;
-	imageObject.src = "originals/" + fileName;
+	if (imageFiles === undefined)
+		imageObject.src = "originals/" + fileNameField.options[selectedIndex].value;
+	else
+		imageObject.src = URL.createObjectURL(imageFiles[selectedIndex]);
 }
 function prevImage()
 {
@@ -828,8 +841,6 @@ function Filter(selectElement, inputElement, textNode)
 	this.value = inputElement.value;
 	this.tableRow = selectElement.parentNode.parentNode;
 }
-
-var filterDiv = null;
 var filters = [];
 
 function applyFilters()
@@ -1031,25 +1042,58 @@ function createFilterDiv()
 	var table = document.createElement('TABLE');
 	table.appendChild(tableRow);
 
-	filterDiv = document.createElement('DIV');
-	filterDiv.id = 'filterDiv';
+	var filterDiv = document.getElementById('filterDiv');
 	filterDiv.appendChild(table);
-
-	controlDiv.appendChild(filterDiv);
 }
 function toggleShowFilters()
 {
-	if (filterDiv === null)
+	if (filters.length === 0)
 		createFilterDiv();
+
+	var filterDiv = document.getElementById('filterDiv');
 
 	if (document.getElementById('showFiltersCheckbox').checked)
 		filterDiv.style.display = 'block';
 	else
 		filterDiv.style.display = 'none';
 }
+function toggleFileBrowser()
+{
+	var fileBrowserDiv = document.getElementById('fileBrowserDiv');
+
+	if (document.getElementById('fileBrowserCheckbox').checked)
+		fileBrowserDiv.style.display = 'block';
+	else
+		fileBrowserDiv.style.display = 'none';
+}
+function loadFiles()
+{
+	var files = document.getElementById("fileBrowser").files;
+
+	if (files.length === 0) return;
+
+	imageNames = [];
+	imageFiles = [];
+	for (var i = 0; i < files.length; ++i)
+	{
+		var file = files[i];
+		imageNames.push(file.name);
+		imageFiles.push(file);
+	}
+
+	var fileNameField = document.getElementById("fileNameField");
+	fileNameField.options.length = 0;
+	fileNameField.selectedIndex = -1;
+
+	loadImage();
+}
 function bodyLoaded()
 {
-	document.getElementById('showFiltersCheckbox').checked = false;
+	controlDiv = document.getElementById("controlDiv");
+	controlDiv.onmousedown = startControlDivDrag;
+
+	document.getElementById("showFiltersCheckbox").checked = false;
+	document.getElementById("fileBrowserCheckbox").checked = false;
 	loadImage();
 }
 </script>
@@ -1087,12 +1131,17 @@ Crop Inverse Aspect Ratio
 &nbsp;&nbsp;
 <input type="checkbox" id="showFiltersCheckbox" onclick="toggleShowFilters()" />
 Show Filters
+&nbsp;&nbsp;
+<input type="checkbox" id="fileBrowserCheckbox" onclick="toggleFileBrowser()" />
+Browse Files
 <br>
+<div id="fileBrowserDiv"><input type="file" id="fileBrowser" accept="image/*" multiple onchange="loadFiles()" /></div>
 Image Filename: <select id="fileNameField" onchange="loadImage()"></select>
 <input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
 <input type="button" id="nextButton" value="Next" onclick="nextImage()" />
 <br>
 <input type="text" id="specParam" size="44" value="" readonly />
+<div id="filterDiv"></div>
 </div>
 
 </body>
