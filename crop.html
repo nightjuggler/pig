@@ -766,11 +766,11 @@ function imageLoaded()
 {
 	if (cropped) undo();
 
-	photo = document.getElementById("photo");
 	photo.src = this.src;
-
 	originalWidth = this.width;
 	originalHeight = this.height;
+	URL.revokeObjectURL(this.src);
+
 	init();
 }
 function loadImage()
@@ -1070,16 +1070,20 @@ function loadFiles()
 {
 	var files = document.getElementById("fileBrowser").files;
 
-	if (files.length === 0) return;
+	var newImageNames = [];
+	var newImageFiles = [];
 
-	imageNames = [];
-	imageFiles = [];
 	for (var i = 0; i < files.length; ++i)
-	{
-		var file = files[i];
-		imageNames.push(file.name);
-		imageFiles.push(file);
-	}
+		if (files[i].type.substr(0, 6) === 'image/')
+		{
+			newImageNames.push(files[i].name);
+			newImageFiles.push(files[i]);
+		}
+
+	if (newImageNames.length === 0) return;
+
+	imageNames = newImageNames;
+	imageFiles = newImageFiles;
 
 	var fileNameField = document.getElementById("fileNameField");
 	fileNameField.options.length = 0;
@@ -1089,8 +1093,13 @@ function loadFiles()
 }
 function bodyLoaded()
 {
+	photo = document.getElementById("photo");
+
 	controlDiv = document.getElementById("controlDiv");
 	controlDiv.onmousedown = startControlDivDrag;
+
+	// Hack for Mozilla to clear any previously selected files
+	document.getElementById("fileBrowser").value = "";
 
 	document.getElementById("showFiltersCheckbox").checked = false;
 	document.getElementById("fileBrowserCheckbox").checked = false;
