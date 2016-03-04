@@ -84,6 +84,27 @@ input, select {
 a {
 	text-decoration: none;
 }
+#filterDiv table {
+	margin-left: auto;
+	margin-right: auto;
+	border-spacing: 0;
+}
+#filterDiv td {
+	padding-left: 4px;
+	padding-right: 4px;
+	text-align: left;
+}
+.clickable {
+	font-size: 12pt;
+	padding-left: 2px;
+	padding-right: 2px;
+	text-align: center;
+}
+.clickable:hover {
+	background-color: rgb(136,136,136);
+	color: rgb(255,255,255);
+	cursor: pointer;
+}
 </style>
 <script src="cropList.js"></script>
 <script>
@@ -726,7 +747,8 @@ function controlDivDrag(event)
 }
 function startControlDivDrag(event)
 {
-	if (event.target !== controlDiv) return true;
+	if (event.target instanceof HTMLInputElement ||
+		event.target instanceof HTMLSelectElement) return true;
 	startX = controlDiv.offsetLeft - event.clientX;
 	startY = controlDiv.offsetTop - event.clientY;
 	document.onmousemove = controlDivDrag;
@@ -780,9 +802,259 @@ function nextImage()
 		++fileNameField.selectedIndex;
 	loadImage();
 }
+function FilterOption(name, unit, defaultValue, minValue, maxValue)
+{
+	this.name = name;
+	this.unit = unit;
+	this.defaultValue = defaultValue;
+	this.minValue = minValue;
+	this.maxValue = maxValue;
+}
+var filterOptions = [
+	new FilterOption('blur',       'px',    0, 0,   20),
+	new FilterOption('brightness', '%',   100, 0, 9999),
+	new FilterOption('contrast',   '%',   100, 0, 9999),
+	new FilterOption('grayscale',  '%',     0, 0,  100),
+	new FilterOption('hue-rotate', 'deg',   0, 0,  360),
+	new FilterOption('invert',     '%',     0, 0,  100),
+	new FilterOption('saturate',   '%',   100, 0, 9999),
+	new FilterOption('sepia',      '%',     0, 0,  100)
+];
+function Filter(selectElement, inputElement, textNode)
+{
+	this.selectElement = selectElement;
+	this.inputElement = inputElement;
+	this.textNode = textNode;
+	this.value = inputElement.value;
+	this.tableRow = selectElement.parentNode.parentNode;
+}
+
+var filterDiv = null;
+var filters = [];
+
+function applyFilters()
+{
+	var filterList = [];
+	for (var filter of filters)
+	{
+		var option = filterOptions[filter.selectElement.selectedIndex];
+
+		filterList.push(option.name + '(' + filter.value + option.unit + ')');
+	}
+	var filterStyle = filterList.join(' ');
+	photo.style.webkitFilter = filterStyle;
+	photo.style.filter = filterStyle;
+}
+function changeFilterName(event)
+{
+	var selectElement = event.currentTarget;
+	var tableRow = selectElement.parentNode.parentNode;
+
+	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
+	var option = filterOptions[selectElement.selectedIndex];
+
+	filter.value = filter.inputElement.value = option.defaultValue;
+	filter.textNode.nodeValue = option.unit;
+
+	applyFilters();
+}
+function changeFilterValue(event)
+{
+	var inputElement = event.currentTarget;
+	var tableRow = inputElement.parentNode.parentNode;
+
+	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
+	var option = filterOptions[filter.selectElement.selectedIndex];
+
+	var value = parseInt(inputElement.value, 10);
+
+	if (isNaN(value) || value != inputElement.value || value < option.minValue || value > option.maxValue) {
+		inputElement.value = filter.value;
+	} else {
+		filter.value = inputElement.value;
+		applyFilters();
+	}
+}
+function addFilterRowBefore(event)
+{
+	var span = event.currentTarget;
+	var tableRow = span.parentNode.parentNode;
+	var rowNumber = parseInt(tableRow.id.substr(9), 10); // e.g. filterRow0
+
+	if (rowNumber === 0) // Remove +
+	{
+		var firstCell = tableRow.firstChild;
+		firstCell.replaceChild(createEmptyText(), firstCell.firstChild);
+	}
+	if (filters.length === 1) // Add X
+	{
+		var lastCell = tableRow.lastChild;
+		lastCell.replaceChild(createXMarkAfter(), lastCell.firstChild);
+	}
+
+	for (var i = filters.length - 1; i >= rowNumber; --i)
+	{
+		filters[i].tableRow.id = 'filterRow' + (i + 1);
+		filters[i + 1] = filters[i];
+	}
+
+	var newRow = createFilterRow(rowNumber);
+	tableRow.parentNode.insertBefore(newRow, tableRow);
+}
+function addFilterRowAfter(event)
+{
+	var span = event.currentTarget;
+	var tableRow = span.parentNode.parentNode;
+	var rowNumber = parseInt(tableRow.id.substr(9), 10); // e.g. filterRow0
+
+	if (filters.length === 1) // Add X
+	{
+		var lastCell = tableRow.lastChild;
+		lastCell.replaceChild(createXMarkAfter(), lastCell.firstChild);
+	}
+
+	for (var i = filters.length - 1; i > rowNumber; --i)
+	{
+		filters[i].tableRow.id = 'filterRow' + (i + 1);
+		filters[i + 1] = filters[i];
+	}
+
+	var newRow = createFilterRow(rowNumber + 1);
+	tableRow.parentNode.insertBefore(newRow, tableRow.nextSibling);
+}
+function removeFilterRow(event)
+{
+	var span = event.currentTarget;
+	var tableRow = span.parentNode.parentNode;
+	var rowNumber = parseInt(tableRow.id.substr(9), 10); // e.g. filterRow0
+
+	tableRow.parentNode.removeChild(tableRow);
+
+	for (var i = rowNumber; i < filters.length - 1; ++i)
+	{
+		filters[i] = filters[i + 1];
+		filters[i].tableRow.id = 'filterRow' + i;
+	}
+
+	filters.length -= 1;
+
+	if (filters.length === 1) // Remove X
+	{
+		var lastCell = filters[0].tableRow.lastChild;
+		lastCell.replaceChild(createEmptyText(), lastCell.firstChild);
+	}
+	if (rowNumber === 0) // Add +
+	{
+		var firstCell = filters[0].tableRow.firstChild;
+		firstCell.replaceChild(createPlusBefore(), firstCell.firstChild);
+	}
+
+	applyFilters();
+}
+function createClickableText(text, clickHandler)
+{
+	var span = document.createElement('SPAN');
+	span.appendChild(document.createTextNode(text));
+	span.className = 'clickable';
+	span.addEventListener('click', clickHandler, false);
+	return span;
+}
+function createPlusBefore()
+{
+	return createClickableText('+', addFilterRowBefore);
+}
+function createPlusAfter()
+{
+	return createClickableText('+', addFilterRowAfter);
+}
+function createXMarkAfter()
+{
+	return createClickableText('\u00D7', removeFilterRow);
+}
+function createEmptyText()
+{
+	return document.createTextNode('\u00A0');
+}
+function addFilterCell(tableRow, cellChild)
+{
+	var tableCell = document.createElement('TD');
+	tableCell.appendChild(cellChild);
+	tableRow.appendChild(tableCell);
+}
+function createFilterRow(rowNumber)
+{
+	var tableRow = document.createElement('TR');
+	tableRow.id = 'filterRow' + rowNumber;
+
+	if (rowNumber === 0)
+		addFilterCell(tableRow, createPlusBefore());
+	else
+		addFilterCell(tableRow, createEmptyText());
+
+	var selectElement = document.createElement('SELECT');
+	selectElement.addEventListener('change', changeFilterName, false);
+
+	for (var option of filterOptions)
+		selectElement.add(new Option(option.name, option.name, false, false));
+
+	option = filterOptions[selectElement.selectedIndex = 2];
+
+	var inputElement = document.createElement('INPUT');
+	inputElement.type = 'text';
+	inputElement.size = 4;
+	inputElement.maxLength = 4;
+	inputElement.value = option.defaultValue;
+	inputElement.addEventListener('change', changeFilterValue, false);
+
+	var textNode = document.createTextNode(option.unit);
+
+	var tableCell = document.createElement('TD');
+	tableCell.appendChild(selectElement);
+	tableCell.appendChild(inputElement);
+	tableCell.appendChild(textNode);
+	tableRow.appendChild(tableCell);
+
+	filters[rowNumber] = new Filter(selectElement, inputElement, textNode);
+
+	addFilterCell(tableRow, createPlusAfter());
+	if (filters.length === 1)
+		addFilterCell(tableRow, createEmptyText());
+	else
+		addFilterCell(tableRow, createXMarkAfter());
+
+	return tableRow;
+}
+function createFilterDiv()
+{
+	var tableRow = createFilterRow(0);
+
+	var table = document.createElement('TABLE');
+	table.appendChild(tableRow);
+
+	filterDiv = document.createElement('DIV');
+	filterDiv.id = 'filterDiv';
+	filterDiv.appendChild(table);
+
+	controlDiv.appendChild(filterDiv);
+}
+function toggleShowFilters()
+{
+	if (filterDiv === null)
+		createFilterDiv();
+
+	if (document.getElementById('showFiltersCheckbox').checked)
+		filterDiv.style.display = 'block';
+	else
+		filterDiv.style.display = 'none';
+}
+function bodyLoaded()
+{
+	document.getElementById('showFiltersCheckbox').checked = false;
+	loadImage();
+}
 </script>
 </head>
-<body onload="loadImage()">
+<body onload="bodyLoaded()">
 
 <div id="photoDiv"><img id="photo" /></div>
 
@@ -812,6 +1084,9 @@ Display Width x Height: <input
 <br>
 <input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
 Crop Inverse Aspect Ratio
+&nbsp;&nbsp;
+<input type="checkbox" id="showFiltersCheckbox" onclick="toggleShowFilters()" />
+Show Filters
 <br>
 Image Filename: <select id="fileNameField" onchange="loadImage()"></select>
 <input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
