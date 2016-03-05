@@ -108,6 +108,10 @@ a {
 #filterDiv, #fileBrowserDiv {
 	display: none;
 }
+input[type="range"] {
+	vertical-align: middle;
+/*	width: 180px;*/
+}
 </style>
 <script src="cropList.js"></script>
 <script>
@@ -383,6 +387,7 @@ function setDisplayArea()
 
 	document.getElementById("divWidth").value = divWidth;
 	document.getElementById("divHeight").value = divHeight;
+	document.getElementById("aspectRatio").firstChild.nodeValue = '(' + aspectX + ':' + aspectY + ')';
 
 	photoLeft = 0;
 	photoTop = 0;
@@ -853,17 +858,18 @@ function FilterOption(name, unit, defaultValue, minValue, maxValue)
 }
 var filterOptions = [
 	new FilterOption('blur',       'px',    0, 0,   20),
-	new FilterOption('brightness', '%',   100, 0, 9999),
-	new FilterOption('contrast',   '%',   100, 0, 9999),
+	new FilterOption('brightness', '%',   100, 0, 2000),
+	new FilterOption('contrast',   '%',   100, 0,  800),
 	new FilterOption('grayscale',  '%',     0, 0,  100),
 	new FilterOption('hue-rotate', 'deg',   0, 0,  360),
 	new FilterOption('invert',     '%',     0, 0,  100),
 	new FilterOption('saturate',   '%',   100, 0, 9999),
 	new FilterOption('sepia',      '%',     0, 0,  100)
 ];
-function Filter(selectElement, inputElement, textNode)
+function Filter(selectElement, sliderElement, inputElement, textNode)
 {
 	this.selectElement = selectElement;
+	this.sliderElement = sliderElement;
 	this.inputElement = inputElement;
 	this.textNode = textNode;
 	this.value = inputElement.value;
@@ -892,7 +898,12 @@ function changeFilterName(event)
 	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
 	var option = filterOptions[selectElement.selectedIndex];
 
-	filter.value = filter.inputElement.value = option.defaultValue;
+	filter.sliderElement.min = option.minValue;
+	filter.sliderElement.max = option.maxValue;
+
+	filter.value = option.defaultValue;
+	filter.sliderElement.value = option.defaultValue;
+	filter.inputElement.value = option.defaultValue;
 	filter.textNode.nodeValue = option.unit;
 
 	applyFilters();
@@ -911,6 +922,10 @@ function changeFilterValue(event)
 		inputElement.value = filter.value;
 	} else {
 		filter.value = inputElement.value;
+		if (inputElement === filter.sliderElement)
+			filter.inputElement.value = filter.value;
+		else
+			filter.sliderElement.value = filter.value;
 		applyFilters();
 	}
 }
@@ -1038,6 +1053,13 @@ function createFilterRow(rowNumber)
 
 	option = filterOptions[selectElement.selectedIndex = 2];
 
+	var sliderElement = document.createElement('INPUT');
+	sliderElement.type = 'range';
+	sliderElement.min = option.minValue;
+	sliderElement.max = option.maxValue;
+	sliderElement.value = option.defaultValue;
+	sliderElement.addEventListener('change', changeFilterValue, false);
+
 	var inputElement = document.createElement('INPUT');
 	inputElement.type = 'text';
 	inputElement.size = 4;
@@ -1049,11 +1071,12 @@ function createFilterRow(rowNumber)
 
 	var tableCell = document.createElement('TD');
 	tableCell.appendChild(selectElement);
+	tableCell.appendChild(sliderElement);
 	tableCell.appendChild(inputElement);
 	tableCell.appendChild(textNode);
 	tableRow.appendChild(tableCell);
 
-	filters[rowNumber] = new Filter(selectElement, inputElement, textNode);
+	filters[rowNumber] = new Filter(selectElement, sliderElement, inputElement, textNode);
 
 	addFilterCell(tableRow, createPlusAfter());
 	if (filters.length === 1)
@@ -1168,6 +1191,7 @@ Crop Area (Width x Height + X + Y): <input
 Display Width x Height: <input
 	type="text" readonly id="divWidth" size="4" value="" />x<input
 	type="text" readonly id="divHeight" size="4" value="" />
+<span id="aspectRatio">(:)</span>
 <br>
 <input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
 Crop Inverse Aspect Ratio
