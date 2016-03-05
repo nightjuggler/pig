@@ -366,3 +366,7 @@ class Image(object):
 			return time.mktime(time.strptime(tagData.value, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:
 			return 0
+
+	def printExif(self):
+		if self.exifData is not None:
+			exifPrintSorted(self.exifData)
