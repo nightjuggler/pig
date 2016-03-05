@@ -296,20 +296,33 @@ function dragResize(event)
 		startY = event.clientY;
 		return false;
 	}
-	var cropperDimension;
+
+	var delta;
+	var aspect;
+	var cropDimension;
 	var setCropDimension;
+
 	if (absdX > absdY) {
-		cropperDimension = cropperWidth - dX - dX;
+		delta = dX;
 		setCropDimension = (rotateAngle === 0 || rotateAngle === 180) ? setCropWidth : setCropHeight;
 	} else {
-		cropperDimension = cropperHeight - dY - dY;
+		delta = dY;
 		setCropDimension = (rotateAngle === 0 || rotateAngle === 180) ? setCropHeight : setCropWidth;
 	}
-	var width = cropperWidth;
-	var height = cropperHeight;
-	setCropDimension(Math.round(cropperDimension * photoScale));
-	if (width == cropperWidth && height == cropperHeight)
+
+	if (setCropDimension === setCropWidth) {
+		aspect = aspectX;
+		cropDimension = cropWidth;
+	} else {
+		aspect = aspectY;
+		cropDimension = cropHeight;
+	}
+
+	delta = Math.trunc(2 * delta * photoScale / aspect) * aspect;
+	if (delta === 0)
 		return false;
+
+	setCropDimension(cropDimension - delta);
 	startX = event.clientX;
 	startY = event.clientY;
 	return false;
@@ -863,7 +876,7 @@ var filterOptions = [
 	new FilterOption('grayscale',  '%',     0, 0,  100),
 	new FilterOption('hue-rotate', 'deg',   0, 0,  360),
 	new FilterOption('invert',     '%',     0, 0,  100),
-	new FilterOption('saturate',   '%',   100, 0, 9999),
+	new FilterOption('saturate',   '%',   100, 0, 1000),
 	new FilterOption('sepia',      '%',     0, 0,  100)
 ];
 function Filter(selectElement, sliderElement, inputElement, textNode)
