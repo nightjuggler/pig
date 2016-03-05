@@ -286,10 +286,12 @@ function dragResize(event)
 	var absdY = Math.abs(dY);
 	if (absdX < 2 && absdY < 2)
 		return false;
-	startX = event.clientX;
-	startY = event.clientY;
 	if (dX * dY <= 0)
+	{
+		startX = event.clientX;
+		startY = event.clientY;
 		return false;
+	}
 	var cropperDimension;
 	var setCropDimension;
 	if (absdX > absdY) {
@@ -299,7 +301,13 @@ function dragResize(event)
 		cropperDimension = cropperHeight - dY - dY;
 		setCropDimension = (rotateAngle === 0 || rotateAngle === 180) ? setCropHeight : setCropWidth;
 	}
+	var width = cropperWidth;
+	var height = cropperHeight;
 	setCropDimension(Math.round(cropperDimension * photoScale));
+	if (width == cropperWidth && height == cropperHeight)
+		return false;
+	startX = event.clientX;
+	startY = event.clientY;
 	return false;
 }
 function startDragResize(event)
@@ -348,8 +356,8 @@ function greatestCommonDivisor(a, b)
 }
 function setDisplayArea()
 {
-	var width = document.getElementById("divWidth").value;
-	var height = document.getElementById("divHeight").value;
+	var width = 900;
+	var height = 600;
 
 	if (originalWidth > originalHeight && width > height ||
 		originalWidth < originalHeight && width < height)
@@ -360,6 +368,21 @@ function setDisplayArea()
 		divWidth = height;
 		divHeight = width;
 	}
+
+	if (divWidth > originalWidth)
+		divWidth = originalWidth;
+	if (divHeight > originalHeight)
+		divHeight = originalHeight;
+
+	if (divWidth / divHeight != originalWidth / originalHeight)
+	{
+		var m = Math.floor(divWidth / aspectX);
+		divWidth = m * aspectX;
+		divHeight = m * aspectY;
+	}
+
+	document.getElementById("divWidth").value = divWidth;
+	document.getElementById("divHeight").value = divHeight;
 
 	photoLeft = 0;
 	photoTop = 0;
@@ -399,13 +422,13 @@ function init()
 
 	cropWidthField = document.getElementById("cropWidthField");
 	cropHeightField = document.getElementById("cropHeightField");
-	cropWidthField.value = cropWidth = originalWidth / 2;
-	cropHeightField.value = cropHeight = originalHeight / 2;
+	cropWidthField.value = cropWidth = Math.max(divWidth, originalWidth / 2);
+	cropHeightField.value = cropHeight = Math.max(divHeight, originalHeight / 2);
 
 	cropXField = document.getElementById("cropXField");
 	cropYField = document.getElementById("cropYField");
-	cropXField.value = originalWidth / 4;
-	cropYField.value = originalHeight / 4;
+	cropXField.value = (originalWidth - cropWidth) / 2;
+	cropYField.value = (originalHeight - cropHeight) / 2;
 
 	setCropperXY();
 	cropperWidth = cropWidth / photoScale;
@@ -1143,8 +1166,8 @@ Crop Area (Width x Height + X + Y): <input
 <input type="button" value="Rotate 180" onclick="rotatePhoto(180)" />
 <br>
 Display Width x Height: <input
-	type="text" readonly id="divWidth" size="4" value="900" />x<input
-	type="text" readonly id="divHeight" size="4" value="600" />
+	type="text" readonly id="divWidth" size="4" value="" />x<input
+	type="text" readonly id="divHeight" size="4" value="" />
 <br>
 <input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
 Crop Inverse Aspect Ratio
