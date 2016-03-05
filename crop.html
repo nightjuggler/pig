@@ -44,8 +44,8 @@ input, select {
 	position: absolute;
 	width: 596px; /* 600 with the border */
 	height: 396px; /* 400 with the border */
-	top: 100px;
-	left: 100px;
+	top: 12px;
+	left: 12px;
 	border: 2px dashed black;
 	cursor: move;
 }
@@ -407,7 +407,6 @@ function init()
 	cropXField.value = originalWidth / 4;
 	cropYField.value = originalHeight / 4;
 
-	cropper = document.getElementById("cropper");
 	setCropperXY();
 	cropperWidth = cropWidth / photoScale;
 	cropperHeight = cropHeight / photoScale;
@@ -766,6 +765,9 @@ function imageLoaded()
 {
 	if (cropped) undo();
 
+	cropper.style.cursor = 'move';
+	document.body.style.cursor = 'default';
+
 	photo.src = this.src;
 	originalWidth = this.width;
 	originalHeight = this.height;
@@ -793,6 +795,9 @@ function loadImage()
 	var selectedIndex = fileNameField.selectedIndex;
 	prevButton.disabled = (selectedIndex === 0);
 	nextButton.disabled = (selectedIndex === fileNameField.options.length - 1);
+
+	cropper.style.cursor = 'wait';
+	document.body.style.cursor = 'wait';
 
 	var imageObject = new Image();
 	imageObject.onload = imageLoaded;
@@ -1094,12 +1099,18 @@ function loadFiles()
 function bodyLoaded()
 {
 	photo = document.getElementById("photo");
+	cropper = document.getElementById("cropper");
+
+	var photoDiv = document.getElementById("photoDiv");
+	cropper.style.left = (photoDiv.offsetLeft + 4) + 'px';
+	cropper.style.top = (photoDiv.offsetTop + 4) + 'px';
 
 	controlDiv = document.getElementById("controlDiv");
 	controlDiv.onmousedown = startControlDivDrag;
 
 	// Hack for Mozilla to clear any previously selected files
 	document.getElementById("fileBrowser").value = "";
+	document.getElementById("specParam").value = "";
 
 	document.getElementById("showFiltersCheckbox").checked = false;
 	document.getElementById("fileBrowserCheckbox").checked = false;
