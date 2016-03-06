@@ -105,8 +105,12 @@ a {
 	color: rgb(255,255,255);
 	cursor: pointer;
 }
-#filterDiv, #fileBrowserDiv {
+#filterDiv, #fileBrowser {
 	display: none;
+}
+#fileBrowserLink {
+	color: rgb(0,0,238);
+	cursor: pointer;
 }
 input[type="range"] {
 	vertical-align: middle;
@@ -394,6 +398,8 @@ function setDisplayArea()
 	if (divWidth / divHeight != originalWidth / originalHeight)
 	{
 		var m = Math.floor(divWidth / aspectX);
+		if (m === 0)
+			m = 1;
 		divWidth = m * aspectX;
 		divHeight = m * aspectY;
 	}
@@ -1121,14 +1127,9 @@ function toggleShowFilters()
 	else
 		filterDiv.style.display = 'none';
 }
-function toggleFileBrowser()
+function browseFiles()
 {
-	var fileBrowserDiv = document.getElementById('fileBrowserDiv');
-
-	if (document.getElementById('fileBrowserCheckbox').checked)
-		fileBrowserDiv.style.display = 'block';
-	else
-		fileBrowserDiv.style.display = 'none';
+	document.getElementById("fileBrowser").click();
 }
 function loadFiles()
 {
@@ -1172,7 +1173,6 @@ function bodyLoaded()
 	document.getElementById("specParam").value = "";
 
 	document.getElementById("showFiltersCheckbox").checked = false;
-	document.getElementById("fileBrowserCheckbox").checked = false;
 	loadImage();
 }
 </script>
@@ -1212,11 +1212,10 @@ Crop Inverse Aspect Ratio
 <input type="checkbox" id="showFiltersCheckbox" onclick="toggleShowFilters()" />
 Show Filters
 &nbsp;&nbsp;
-<input type="checkbox" id="fileBrowserCheckbox" onclick="toggleFileBrowser()" />
-Browse Files
+<span id="fileBrowserLink" onclick="browseFiles()">Browse Files</span>
 <br>
-<div id="fileBrowserDiv"><input type="file" id="fileBrowser" accept="image/*" multiple onchange="loadFiles()" /></div>
-Image Filename: <select id="fileNameField" onchange="loadImage()"></select>
+<input type="file" id="fileBrowser" accept="image/*" multiple onchange="loadFiles()" />
+File: <select id="fileNameField" onchange="loadImage()"></select>
 <input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
 <input type="button" id="nextButton" value="Next" onclick="nextImage()" />
 <br>
