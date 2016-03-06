@@ -112,9 +112,20 @@ a {
 	color: rgb(0,0,238);
 	cursor: pointer;
 }
+#fileBrowserLink:hover {
+	color: rgb(238,0,0);
+}
 input[type="range"] {
 	vertical-align: middle;
 /*	width: 180px;*/
+}
+#canvas {
+	border: 4px solid black;
+	display: none;
+	margin-top: 4px;
+}
+#downloadLink {
+	display: none;
 }
 </style>
 <script src="cropList.js"></script>
@@ -818,7 +829,9 @@ function imageLoaded()
 	photo.src = this.src;
 	originalWidth = this.width;
 	originalHeight = this.height;
-	URL.revokeObjectURL(this.src);
+
+	if (imageFiles !== undefined)
+		URL.revokeObjectURL(this.src);
 
 	init();
 }
@@ -826,10 +839,12 @@ function loadImage()
 {
 	var prevButton = document.getElementById("prevButton");
 	var nextButton = document.getElementById("nextButton");
+	var downloadLink = document.getElementById("downloadLink");
 	if (imageNames === undefined)
 	{
 		prevButton.disabled = true;
 		nextButton.disabled = true;
+		downloadLink.style.display = "none";
 		return;
 	}
 	var fileNameField = document.getElementById("fileNameField");
@@ -843,13 +858,16 @@ function loadImage()
 	prevButton.disabled = (selectedIndex === 0);
 	nextButton.disabled = (selectedIndex === fileNameField.options.length - 1);
 
+	downloadLink.download = imageNames[selectedIndex];
+	downloadLink.style.display = "inline";
+
 	cropper.style.cursor = 'wait';
 	document.body.style.cursor = 'wait';
 
 	var imageObject = new Image();
 	imageObject.onload = imageLoaded;
 	if (imageFiles === undefined)
-		imageObject.src = "originals/" + fileNameField.options[selectedIndex].value;
+		imageObject.src = "originals/" + imageNames[selectedIndex];
 	else
 		imageObject.src = URL.createObjectURL(imageFiles[selectedIndex]);
 }
@@ -866,6 +884,155 @@ function nextImage()
 	if (fileNameField.selectedIndex < fileNameField.options.length - 1)
 		++fileNameField.selectedIndex;
 	loadImage();
+}
+function applyFullFilterMatrix(d, a0, a1, a2, a3)
+{
+	var dLen = d.length;
+	for (var i = 0; i < dLen; i += 4)
+	{
+		var r = d[i];
+		var g = d[i + 1];
+		var b = d[i + 2];
+		var a = d[i + 3];
+
+		d[i]     = a0[0] * r + a0[1] * g + a0[2] * b + a0[3] * a + a0[4] * 255;
+		d[i + 1] = a1[0] * r + a1[1] * g + a1[2] * b + a1[3] * a + a1[4] * 255;
+		d[i + 2] = a2[0] * r + a2[1] * g + a2[2] * b + a2[3] * a + a2[4] * 255;
+		d[i + 3] = a3[0] * r + a3[1] * g + a3[2] * b + a3[3] * a + a3[4] * 255;
+	}
+}
+function applyFilterMatrix(d, a0, a1, a2)
+{
+	var dLen = d.length;
+	for (var i = 0; i < dLen; i += 4)
+	{
+		var r = d[i];
+		var g = d[i + 1];
+		var b = d[i + 2];
+
+		d[i]     = a0[0] * r + a0[1] * g + a0[2] * b;
+		d[i + 1] = a1[0] * r + a1[1] * g + a1[2] * b;
+		d[i + 2] = a2[0] * r + a2[1] * g + a2[2] * b;
+	}
+}
+function applyBrightnessFilter(d, value)
+{
+	var dLen = d.length;
+	for (var i = 0; i < dLen; i += 4)
+	{
+		d[i]     *= value;
+		d[i + 1] *= value;
+		d[i + 2] *= value;
+	}
+}
+function applyContrastFilter(d, value)
+{
+	var intercept = 255 * (0.5 - 0.5 * value);
+
+	var dLen = d.length;
+	for (var i = 0; i < dLen; i += 4)
+	{
+		d[i]     = d[i]     * value + intercept;
+		d[i + 1] = d[i + 1] * value + intercept;
+		d[i + 2] = d[i + 2] * value + intercept;
+	}
+}
+function applyGrayscaleFilter(d, value)
+{
+	var s = 1 - value;
+
+	applyFilterMatrix(d,
+		[0.2126 + 0.7874*s, 0.7152 - 0.7152*s, 0.0722 - 0.0722*s],
+		[0.2126 - 0.2126*s, 0.7152 + 0.2848*s, 0.0722 - 0.0722*s],
+		[0.2126 - 0.2126*s, 0.7152 - 0.7152*s, 0.0722 + 0.9278*s]);
+}
+function applyHueRotateFilter(d, value)
+{
+	value *= Math.PI / 180; // Convert degrees to radians
+
+	var c = Math.cos(value);
+	var s = Math.sin(value);
+
+	applyFilterMatrix(d,
+		[0.213 + 0.787*c - 0.213*s, 0.715 - 0.715*c - 0.715*s, 0.072 - 0.072*c + 0.928*s],
+		[0.213 - 0.213*c + 0.143*s, 0.715 + 0.285*c + 0.140*s, 0.072 - 0.072*c - 0.283*s],
+		[0.213 - 0.213*c - 0.787*s, 0.715 - 0.715*c + 0.715*s, 0.072 + 0.928*c + 0.072*s]);
+}
+function applyInvertFilter(d, value)
+{
+	var m = 1.0 - value - value;
+	var c = 255 * value;
+
+	var dLen = d.length;
+	for (var i = 0; i < dLen; i += 4)
+	{
+		d[i]     = d[i]     * m + c;
+		d[i + 1] = d[i + 1] * m + c;
+		d[i + 2] = d[i + 2] * m + c;
+	}
+}
+function applySaturateFilter(d, value)
+{
+	var s = value;
+
+	applyFilterMatrix(d,
+		[0.213 + 0.787*s, 0.715 - 0.715*s, 0.072 - 0.072*s],
+		[0.213 - 0.213*s, 0.715 + 0.285*s, 0.072 - 0.072*s],
+		[0.213 - 0.213*s, 0.715 - 0.715*s, 0.072 + 0.928*s]);
+}
+function applySepiaFilter(d, value)
+{
+	var s = 1 - value;
+
+	applyFilterMatrix(d,
+		[0.393 + 0.607*s, 0.769 - 0.769*s, 0.189 - 0.189*s],
+		[0.349 - 0.349*s, 0.686 + 0.314*s, 0.168 - 0.168*s],
+		[0.272 - 0.272*s, 0.534 - 0.534*s, 0.131 + 0.869*s]);
+}
+function saveImage(event)
+{
+//	event.preventDefault();
+	var canvas = document.getElementById("canvas");
+
+	canvas.width = divWidth;
+	canvas.height = divHeight;
+//	canvas.style.width = divWidth + "px";
+//	canvas.style.height = divHeight + "px";
+
+	var context = canvas.getContext("2d");
+
+	if (cropped)
+		context.drawImage(photo, +cropXField.value, +cropYField.value,
+			cropWidth, cropHeight, 0, 0, divWidth, divHeight);
+	else
+		context.drawImage(photo, 0, 0, divWidth, divHeight);
+
+	var imageData = context.getImageData(0, 0, divWidth, divHeight);
+
+	for (var filter of filters)
+	{
+		var option = filterOptions[filter.selectElement.selectedIndex];
+
+		if (option.name === "brightness")
+			applyBrightnessFilter(imageData.data, filter.value / 100);
+		else if (option.name === "contrast")
+			applyContrastFilter(imageData.data, filter.value / 100);
+		else if (option.name === "grayscale")
+			applyGrayscaleFilter(imageData.data, filter.value / 100);
+		else if (option.name === "hue-rotate")
+			applyHueRotateFilter(imageData.data, filter.value);
+		else if (option.name === "invert")
+			applyInvertFilter(imageData.data, filter.value / 100);
+		else if (option.name === "saturate")
+			applySaturateFilter(imageData.data, filter.value / 100);
+		else if (option.name === "sepia")
+			applySepiaFilter(imageData.data, filter.value / 100);
+	}
+
+	context.putImageData(imageData, 0, 0);
+
+	var downloadLink = document.getElementById("downloadLink");
+	downloadLink.href = canvas.toDataURL("image/jpeg");
 }
 function FilterOption(name, unit, defaultValue, minValue, maxValue)
 {
@@ -1172,6 +1339,9 @@ function bodyLoaded()
 	document.getElementById("fileBrowser").value = "";
 	document.getElementById("specParam").value = "";
 
+	var downloadLink = document.getElementById("downloadLink");
+	downloadLink.addEventListener("click", saveImage, false);
+
 	document.getElementById("showFiltersCheckbox").checked = false;
 	loadImage();
 }
@@ -1218,10 +1388,12 @@ Show Filters
 File: <select id="fileNameField" onchange="loadImage()"></select>
 <input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
 <input type="button" id="nextButton" value="Next" onclick="nextImage()" />
+<a download href="#" id="downloadLink">Save</a>
 <br>
 <input type="text" id="specParam" size="44" value="" readonly />
 <div id="filterDiv"></div>
 </div>
 
+<canvas id="canvas"></canvas>
 </body>
 </html>
