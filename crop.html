@@ -117,7 +117,7 @@ a {
 }
 input[type="range"] {
 	vertical-align: middle;
-/*	width: 180px;*/
+	width: 180px;
 }
 #canvas {
 	border: 4px solid black;
@@ -171,6 +171,13 @@ var controlDiv;
 
 var imageNames;
 var imageFiles;
+
+var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
+var downloadLink;                // the HTML <a> element for the Save link
+var downloadLinkReady = false;   // only used if downloadBlobURL is true
+var downloadURL = null;          // only used if downloadBlobURL is true
+var downloadQuality = 0.92;
+var downloadType = "image/jpeg";
 
 function releaseElement()
 {
@@ -839,7 +846,6 @@ function loadImage()
 {
 	var prevButton = document.getElementById("prevButton");
 	var nextButton = document.getElementById("nextButton");
-	var downloadLink = document.getElementById("downloadLink");
 	if (imageNames === undefined)
 	{
 		prevButton.disabled = true;
@@ -991,9 +997,17 @@ function applySepiaFilter(d, value)
 }
 function saveImage(event)
 {
-//	event.preventDefault();
-	var canvas = document.getElementById("canvas");
+	if (downloadBlobURL) {
+		if (downloadLinkReady) {
+			downloadLinkReady = false;
+			return;
+		}
+		event.preventDefault();
+		if (downloadURL !== null)
+			URL.revokeObjectURL(downloadURL);
+	}
 
+	var canvas = document.getElementById("canvas");
 	canvas.width = divWidth;
 	canvas.height = divHeight;
 //	canvas.style.width = divWidth + "px";
@@ -1031,8 +1045,15 @@ function saveImage(event)
 
 	context.putImageData(imageData, 0, 0);
 
-	var downloadLink = document.getElementById("downloadLink");
-	downloadLink.href = canvas.toDataURL("image/jpeg");
+	if (downloadBlobURL) {
+		canvas.toBlob(function(blob) {
+			downloadLink.href = downloadURL = URL.createObjectURL(blob);
+			downloadLinkReady = true;
+			downloadLink.click();
+		}, downloadType, downloadQuality);
+	} else {
+		downloadLink.href = canvas.toDataURL(downloadType, downloadQuality);
+	}
 }
 function FilterOption(name, unit, defaultValue, minValue, maxValue)
 {
@@ -1339,7 +1360,7 @@ function bodyLoaded()
 	document.getElementById("fileBrowser").value = "";
 	document.getElementById("specParam").value = "";
 
-	var downloadLink = document.getElementById("downloadLink");
+	downloadLink = document.getElementById("downloadLink");
 	downloadLink.addEventListener("click", saveImage, false);
 
 	document.getElementById("showFiltersCheckbox").checked = false;
