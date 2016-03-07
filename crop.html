@@ -1002,7 +1002,6 @@ function saveImage(event)
 			downloadLinkReady = false;
 			return;
 		}
-		event.preventDefault();
 		if (downloadURL !== null)
 			URL.revokeObjectURL(downloadURL);
 	}
@@ -1020,15 +1019,14 @@ function saveImage(event)
 
 	var context = canvas.getContext("2d");
 
-	if (rotateAngle === 0) {
+	if (rotateAngle === 0)
 		context.setTransform(1, 0, 0, 1, 0, 0);
-	} else if (rotateAngle === 90) {
+	else if (rotateAngle === 90)
 		context.setTransform(0, 1, -1, 0, canvas.width, 0);
-	} else if (rotateAngle === 180) {
+	else if (rotateAngle === 180)
 		context.setTransform(-1, 0, 0, -1, canvas.width, canvas.height);
-	} else if (rotateAngle === 270) {
+	else if (rotateAngle === 270)
 		context.setTransform(0, -1, 1, 0, 0, canvas.height);
-	}
 
 	if (cropped)
 		context.drawImage(photo, +cropXField.value, +cropYField.value,
@@ -1060,7 +1058,11 @@ function saveImage(event)
 
 	context.putImageData(imageData, 0, 0);
 
+	if (downloadBlobURL && canvas.toBlob === undefined) // for Chrome and Safari
+		downloadBlobURL = false;
+
 	if (downloadBlobURL) {
+		event.preventDefault();
 		canvas.toBlob(function(blob) {
 			downloadLink.href = downloadURL = URL.createObjectURL(blob);
 			downloadLinkReady = true;
