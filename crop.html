@@ -1008,12 +1008,27 @@ function saveImage(event)
 	}
 
 	var canvas = document.getElementById("canvas");
-	canvas.width = divWidth;
-	canvas.height = divHeight;
-//	canvas.style.width = divWidth + "px";
-//	canvas.style.height = divHeight + "px";
+	if (rotateAngle === 0 || rotateAngle === 180) {
+		canvas.width = divWidth;
+		canvas.height = divHeight;
+	} else {
+		canvas.width = divHeight;
+		canvas.height = divWidth;
+	}
+//	canvas.style.width = canvas.width + "px";
+//	canvas.style.height = canvas.height + "px";
 
 	var context = canvas.getContext("2d");
+
+	if (rotateAngle === 0) {
+		context.setTransform(1, 0, 0, 1, 0, 0);
+	} else if (rotateAngle === 90) {
+		context.setTransform(0, 1, -1, 0, canvas.width, 0);
+	} else if (rotateAngle === 180) {
+		context.setTransform(-1, 0, 0, -1, canvas.width, canvas.height);
+	} else if (rotateAngle === 270) {
+		context.setTransform(0, -1, 1, 0, 0, canvas.height);
+	}
 
 	if (cropped)
 		context.drawImage(photo, +cropXField.value, +cropYField.value,
@@ -1021,7 +1036,7 @@ function saveImage(event)
 	else
 		context.drawImage(photo, 0, 0, divWidth, divHeight);
 
-	var imageData = context.getImageData(0, 0, divWidth, divHeight);
+	var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
 	for (var filter of filters)
 	{
