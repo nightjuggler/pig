@@ -36,16 +36,14 @@ input, select {
 }
 #spinDisc {
 	display: inline-block;
-	width: 40px;
-	height: 40px;
+	width: 0px;
+	height: 0px;
+
+	border-top: 20px solid rgb(65,105,225); /* RoyalBlue */
+	border-left: 20px solid rgb(135,206,250); /* LightSkyBlue */
+	border-bottom: 20px solid rgb(65,105,225); /* RoyalBlue */
+	border-right: 20px solid rgb(135,206,250); /* LightSkyBlue */
 	border-radius: 20px;
-	background-image:
-		linear-gradient(to bottom,
-			rgba(0,0,0,0), rgba(0,0,0,0) 19px, rgb(0,0,0) 19px,
-			rgb(0,0,0) 21px, rgba(0,0,0,0) 21px, rgba(0,0,0,0)),
-		linear-gradient(to right,
-			rgb(0,0,255), rgb(0,0,255) 19px, rgb(0,0,0) 19px,
-			rgb(0,0,0) 21px, rgb(0,255,0) 21px, rgb(0,255,0));
 
 	animation-name: spinDiscAnimation;
 	animation-duration: 1.5s;
