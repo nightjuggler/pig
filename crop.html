@@ -15,7 +15,7 @@ input, select {
 	margin-top: 2px;
 	margin-bottom: 2px;
 }
-#statusDiv {
+#progressDiv, #failedDiv {
 	background-color: rgb(230,230,250); /* Lavender */
 	border: 2px solid black;
 	border-radius: 10px;
@@ -25,7 +25,10 @@ input, select {
 	padding: 10px;
 	position: absolute;
 }
-#statusText {
+#failedDiv {
+	padding-bottom: 4px;
+}
+#progressText {
 	position: relative;
 	top: -10px;
 	padding-right: 12px;
@@ -203,6 +206,7 @@ var controlDiv;
 
 var imageNames;
 var imageFiles;
+var filters = [];
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
 var downloadLink;                // the HTML <a> element for the Save link
@@ -383,8 +387,7 @@ function dragResize(event)
 }
 function startDragResize(event)
 {
-	event.cancelBubble = true;
-	if (event.stopPropagation) event.stopPropagation();
+	event.stopPropagation();
 	startX = event.clientX;
 	startY = event.clientY;
 	document.onmousemove = dragResize;
@@ -858,6 +861,19 @@ function preventDefault(event)
 {
 	if (event.preventDefault) event.preventDefault();
 }
+function centerElement(element, top, left)
+{
+	if (top === null) {
+		var displayHeight = document.documentElement.clientHeight;
+		top = Math.round((displayHeight - element.clientHeight) / 2);
+	}
+	if (left === null) {
+		var displayWidth = document.documentElement.clientWidth;
+		left = Math.round((displayWidth - element.clientWidth) / 2);
+	}
+	element.style.top = top + "px";
+	element.style.left = left + "px";
+}
 function showLoading(fileName)
 {
 	cropper.style.cursor = "wait";
@@ -865,36 +881,61 @@ function showLoading(fileName)
 
 	document.getElementById("spinDisc").style.animationPlayState = "running";
 
-	var statusDiv = document.getElementById("statusDiv");
-	statusDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
-	statusDiv.style.display = "block";
-
-	var displayWidth = document.documentElement.clientWidth;
-	var displayHeight = document.documentElement.clientHeight;
-
-	var left = Math.round((displayWidth - statusDiv.clientWidth) / 2);
-	var top = Math.round((displayHeight - statusDiv.clientHeight) / 2);
-
-	statusDiv.style.left = left + "px";
-	statusDiv.style.top = top + "px";
+	var progressDiv = document.getElementById("progressDiv");
+	progressDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
+	progressDiv.style.display = "block";
+	centerElement(progressDiv, 96, null);
 }
-function imageLoaded()
+function hideLoading()
+{
+	cropper.style.cursor = "move";
+	document.body.style.cursor = "default";
+
+	document.getElementById("progressDiv").style.display = "none";
+	document.getElementById("spinDisc").style.animationPlayState = "paused";
+}
+function showFailed(fileName)
+{
+	var failedDiv = document.getElementById("failedDiv");
+	failedDiv.firstChild.nodeValue = "Failed to load " + fileName;
+	failedDiv.style.display = "block";
+	centerElement(failedDiv, 22, null);
+}
+function hideFailed()
+{
+	document.getElementById("failedDiv").style.display = "none";
+}
+function imageLoaded(event)
 {
 	if (cropped) undo();
 
-	photo.src = this.src;
-	originalWidth = this.width;
-	originalHeight = this.height;
+	var imageObject = event.target;
+	photo.src = imageObject.src;
+	originalWidth = imageObject.width;
+	originalHeight = imageObject.height;
 
 	if (imageFiles !== undefined)
-		URL.revokeObjectURL(this.src);
+		URL.revokeObjectURL(imageObject.src);
 
 	init();
+	hideLoading();
+}
+function imageFailedLoad(event)
+{
+	hideLoading();
 
-	cropper.style.cursor = "move";
-	document.body.style.cursor = "default";
-	document.getElementById("statusDiv").style.display = "none";
-	document.getElementById("spinDisc").style.animationPlayState = "paused";
+	var fileNameField = document.getElementById("fileNameField");
+	var selectedIndex = fileNameField.selectedIndex;
+
+	showFailed(imageNames[selectedIndex]);
+
+	if (imageNames.length === 1)
+		imageNames = undefined;
+	else
+		imageNames.splice(selectedIndex, 1);
+
+	fileNameField.remove(selectedIndex);
+	loadImage();
 }
 function loadImage()
 {
@@ -924,7 +965,8 @@ function loadImage()
 	showLoading(imageNames[selectedIndex]);
 
 	var imageObject = new Image();
-	imageObject.onload = imageLoaded;
+	imageObject.addEventListener("load", imageLoaded, false);
+	imageObject.addEventListener("error", imageFailedLoad, false);
 	if (imageFiles === undefined)
 		imageObject.src = "originals/" + imageNames[selectedIndex];
 	else
@@ -1152,8 +1194,6 @@ function Filter(selectElement, sliderElement, inputElement, textNode)
 	this.value = inputElement.value;
 	this.tableRow = selectElement.parentNode.parentNode;
 }
-var filters = [];
-
 function applyFilters()
 {
 	var filterList = [];
@@ -1487,7 +1527,8 @@ Crop Inverse Aspect Ratio
 <div id="filterDiv"></div>
 </div>
 
-<div id="statusDiv"><span id="statusText">Loading</span><div id="spinDisc"></div></div>
+<div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
+<div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
 <canvas id="canvas"></canvas>
 </body>
 </html>
