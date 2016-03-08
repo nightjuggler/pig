@@ -5,7 +5,7 @@
 <title>Cropper</title>
 <style>
 body {
-	background-color: white;
+	background-color: rgb(240,255,255); /* Azure */
 	font-family: verdana;
 	font-size: 10pt;
 }
@@ -16,7 +16,7 @@ input, select {
 	margin-bottom: 2px;
 }
 #statusDiv {
-	background-color: rgb(230,230,250);
+	background-color: rgb(230,230,250); /* Lavender */
 	border: 2px solid black;
 	border-radius: 10px;
 	display: none;
@@ -59,8 +59,8 @@ input, select {
 	width: 520px;
 	padding: 2px;
 	position: absolute;
-	left: 100px;
-	top: 500px;
+	left: 52px;
+	top: 422px;
 }
 #photoDiv {
 	position: relative;
@@ -120,6 +120,9 @@ input, select {
 a {
 	text-decoration: none;
 }
+a:hover {
+	color: rgb(218,69,0);
+}
 #filterDiv table {
 	margin-left: auto;
 	margin-right: auto;
@@ -141,15 +144,8 @@ a {
 	color: rgb(255,255,255);
 	cursor: pointer;
 }
-#filterDiv, #fileBrowser {
+#fileBrowser {
 	display: none;
-}
-#fileBrowserLink {
-	color: rgb(0,0,238);
-	cursor: pointer;
-}
-#fileBrowserLink:hover {
-	color: rgb(238,0,0);
 }
 input[type="range"] {
 	vertical-align: middle;
@@ -1377,20 +1373,24 @@ function createFilterDiv()
 	var filterDiv = document.getElementById('filterDiv');
 	filterDiv.appendChild(table);
 }
-function toggleShowFilters()
+function toggleShowFilters(event)
 {
-	if (filters.length === 0)
-		createFilterDiv();
+	event.preventDefault();
 
 	var filterDiv = document.getElementById('filterDiv');
+	var toggleFiltersLink = document.getElementById('toggleFiltersLink').firstChild;
 
-	if (document.getElementById('showFiltersCheckbox').checked)
+	if (filterDiv.style.display === 'none') {
 		filterDiv.style.display = 'block';
-	else
+		toggleFiltersLink.nodeValue = 'Hide Filters';
+	} else {
 		filterDiv.style.display = 'none';
+		toggleFiltersLink.nodeValue = 'Show Filters';
+	}
 }
-function browseFiles()
+function browseFiles(event)
 {
+	event.preventDefault();
 	document.getElementById("fileBrowser").click();
 }
 function loadFiles()
@@ -1437,7 +1437,9 @@ function bodyLoaded()
 	downloadLink = document.getElementById("downloadLink");
 	downloadLink.addEventListener("click", saveImage, false);
 
-	document.getElementById("showFiltersCheckbox").checked = false;
+	createFilterDiv();
+	document.getElementById("toggleFiltersLink").addEventListener("click", toggleShowFilters, false);
+	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	loadImage();
 }
 </script>
@@ -1445,7 +1447,6 @@ function bodyLoaded()
 <body onload="bodyLoaded()">
 
 <div id="photoDiv"><img id="photo" /></div>
-
 <div id="cropper">
 <div id="resizeNW"></div>
 <div id="resizeNE"></div>
@@ -1453,7 +1454,6 @@ function bodyLoaded()
 <div id="resizeSE"></div>
 </div>
 
-<div id="statusDiv"><span id="statusText">Loading</span><div id="spinDisc"></div></div>
 <div id="controlDiv">
 Crop Area (Width x Height + X + Y): <input
 	type="text" id="cropWidthField" size="4" value="" onchange="changeCropWidth()" />x<input
@@ -1474,14 +1474,11 @@ Display Width x Height: <input
 <br>
 <input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
 Crop Inverse Aspect Ratio
-&nbsp;&nbsp;
-<input type="checkbox" id="showFiltersCheckbox" onclick="toggleShowFilters()" />
-Show Filters
-&nbsp;&nbsp;
-<span id="fileBrowserLink" onclick="browseFiles()">Browse Files</span>
+&nbsp;&nbsp;<a href="#" id="toggleFiltersLink">Hide Filters</a>
+&nbsp;&nbsp;<a href="#" id="fileBrowserLink">Browse Files</a>
 <br>
 <input type="file" id="fileBrowser" accept="image/*" multiple onchange="loadFiles()" />
-File: <select id="fileNameField" onchange="loadImage()"></select>
+<select id="fileNameField" onchange="loadImage()"></select>
 <input type="button" id="prevButton" value="Previous" onclick="prevImage()" />
 <input type="button" id="nextButton" value="Next" onclick="nextImage()" />
 <a download href="#" id="downloadLink">Save</a>
@@ -1490,6 +1487,7 @@ File: <select id="fileNameField" onchange="loadImage()"></select>
 <div id="filterDiv"></div>
 </div>
 
+<div id="statusDiv"><span id="statusText">Loading</span><div id="spinDisc"></div></div>
 <canvas id="canvas"></canvas>
 </body>
 </html>
