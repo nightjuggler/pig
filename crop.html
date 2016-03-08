@@ -15,6 +15,44 @@ input, select {
 	margin-top: 2px;
 	margin-bottom: 2px;
 }
+#statusDiv {
+	background-color: rgb(230,230,250);
+	border: 2px solid black;
+	border-radius: 10px;
+	display: none;
+	font-size: 14pt;
+	text-align: center;
+	padding: 10px;
+	position: absolute;
+}
+#statusText {
+	position: relative;
+	top: -10px;
+	padding-right: 12px;
+}
+@keyframes spinDiscAnimation {
+	from { transform: rotateZ(0deg); }
+	to { transform: rotateZ(360deg); }
+}
+#spinDisc {
+	display: inline-block;
+	width: 40px;
+	height: 40px;
+	border-radius: 20px;
+	background-image:
+		linear-gradient(to bottom,
+			rgba(0,0,0,0), rgba(0,0,0,0) 19px, rgb(0,0,0) 19px,
+			rgb(0,0,0) 21px, rgba(0,0,0,0) 21px, rgba(0,0,0,0)),
+		linear-gradient(to right,
+			rgb(0,0,255), rgb(0,0,255) 19px, rgb(0,0,0) 19px,
+			rgb(0,0,0) 21px, rgb(0,255,0) 21px, rgb(0,255,0));
+
+	animation-name: spinDiscAnimation;
+	animation-duration: 1.5s;
+	animation-iteration-count: infinite;
+	animation-timing-function: linear;
+	animation-play-state: paused;
+}
 #controlDiv {
 	background-color: rgba(230,230,250,0.8);
 	border: 2px solid black;
@@ -826,12 +864,29 @@ function preventDefault(event)
 {
 	if (event.preventDefault) event.preventDefault();
 }
+function showLoading(fileName)
+{
+	cropper.style.cursor = "wait";
+	document.body.style.cursor = "wait";
+
+	var statusDiv = document.getElementById("statusDiv");
+	statusDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
+	statusDiv.style.display = "block";
+
+	var displayWidth = document.documentElement.clientWidth;
+	var displayHeight = document.documentElement.clientHeight;
+
+	var left = Math.round((displayWidth - statusDiv.clientWidth) / 2);
+	var top = Math.round((displayHeight - statusDiv.clientHeight) / 2);
+
+	statusDiv.style.left = left + "px";
+	statusDiv.style.top = top + "px";
+
+	document.getElementById("spinDisc").style.animationPlayState = "running";
+}
 function imageLoaded()
 {
 	if (cropped) undo();
-
-	cropper.style.cursor = 'move';
-	document.body.style.cursor = 'default';
 
 	photo.src = this.src;
 	originalWidth = this.width;
@@ -841,6 +896,11 @@ function imageLoaded()
 		URL.revokeObjectURL(this.src);
 
 	init();
+
+	cropper.style.cursor = "move";
+	document.body.style.cursor = "default";
+	document.getElementById("statusDiv").style.display = "none";
+	document.getElementById("spinDisc").style.animationPlayState = "paused";
 }
 function loadImage()
 {
@@ -867,8 +927,7 @@ function loadImage()
 	downloadLink.download = imageNames[selectedIndex];
 	downloadLink.style.display = "inline";
 
-	cropper.style.cursor = 'wait';
-	document.body.style.cursor = 'wait';
+	showLoading(imageNames[selectedIndex]);
 
 	var imageObject = new Image();
 	imageObject.onload = imageLoaded;
@@ -1396,6 +1455,7 @@ function bodyLoaded()
 <div id="resizeSE"></div>
 </div>
 
+<div id="statusDiv"><span id="statusText">Loading</span><div id="spinDisc"></div></div>
 <div id="controlDiv">
 Crop Area (Width x Height + X + Y): <input
 	type="text" id="cropWidthField" size="4" value="" onchange="changeCropWidth()" />x<input
