@@ -863,6 +863,8 @@ function showLoading(fileName)
 	cropper.style.cursor = "wait";
 	document.body.style.cursor = "wait";
 
+	document.getElementById("spinDisc").style.animationPlayState = "running";
+
 	var statusDiv = document.getElementById("statusDiv");
 	statusDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
 	statusDiv.style.display = "block";
@@ -875,8 +877,6 @@ function showLoading(fileName)
 
 	statusDiv.style.left = left + "px";
 	statusDiv.style.top = top + "px";
-
-	document.getElementById("spinDisc").style.animationPlayState = "running";
 }
 function imageLoaded()
 {
