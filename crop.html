@@ -495,6 +495,7 @@ function init()
 	cropInverseAspectRatio = false;
 
 	setDisplayArea();
+	disableCropElements(false);
 	setInverseAspectRatioAbility();
 
 	cropWidthField = document.getElementById("cropWidthField");
@@ -1458,8 +1459,28 @@ function loadFiles()
 
 	loadImage();
 }
+function disableCropElements(disable)
+{
+	var elementIds = [
+		"cropWidthField",
+		"cropHeightField",
+		"cropXField",
+		"cropYField",
+		"cropButton",
+		"undoButton",
+		"rotateLeftButton",
+		"rotateRightButton",
+		"rotate180Button",
+		"inverseAspectRatioCheckbox",
+		"fileNameField"
+	];
+
+	for (var id of elementIds)
+		document.getElementById(id).disabled = disable;
+}
 function bodyLoaded()
 {
+	disableCropElements(true);
 	photo = document.getElementById("photo");
 	cropper = document.getElementById("cropper");
 
@@ -1501,11 +1522,11 @@ Crop Area (Width x Height + X + Y): <input
 	type="text" id="cropXField" size="4" value="" onchange="changeCropX()" />+<input
 	type="text" id="cropYField" size="4" value="" onchange="changeCropY()" />
 <br>
-<input type="button" value="Crop" onclick="crop()" />
-<input type="button" value="Undo" onclick="undo()" />
-<input type="button" value="Rotate Left" onclick="rotatePhoto(270)" />
-<input type="button" value="Rotate Right" onclick="rotatePhoto(90)" />
-<input type="button" value="Rotate 180" onclick="rotatePhoto(180)" />
+<input type="button" value="Crop" id="cropButton" onclick="crop()" />
+<input type="button" value="Undo" id="undoButton" onclick="undo()" />
+<input type="button" value="Rotate Left" id="rotateLeftButton" onclick="rotatePhoto(270)" />
+<input type="button" value="Rotate Right" id="rotateRightButton" onclick="rotatePhoto(90)" />
+<input type="button" value="Rotate 180" id="rotate180Button" onclick="rotatePhoto(180)" />
 <br>
 Display Width x Height: <input
 	type="text" readonly id="divWidth" size="4" value="" />x<input
