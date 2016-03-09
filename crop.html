@@ -164,6 +164,7 @@ input[type="range"] {
 }
 </style>
 <script src="cropList.js"></script>
+<script src="filter.js"></script>
 <script>
 var originalWidth;
 var originalHeight;
@@ -1017,53 +1018,57 @@ function applyFilterMatrix(d, a0, a1, a2)
 		d[i + 2] = a2[0] * r + a2[1] * g + a2[2] * b;
 	}
 }
-function applyBrightnessFilter(d, value)
+function applyBrightnessFilter(d, amount)
 {
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
-		d[i]     *= value;
-		d[i + 1] *= value;
-		d[i + 2] *= value;
+		d[i]     *= amount;
+		d[i + 1] *= amount;
+		d[i + 2] *= amount;
 	}
 }
-function applyContrastFilter(d, value)
+function applyContrastFilter(d, amount)
 {
-	var intercept = 255 * (0.5 - 0.5 * value);
+	// V' = C * (V - 0.5) + 0.5
+	// where C = amount of contrast, V = current channel value, and V' = new channel value
+	// Thus V' = V*C + 0.5 - 0.5*C
+
+	var intercept = 255 * (0.5 - 0.5 * amount);
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
-		d[i]     = d[i]     * value + intercept;
-		d[i + 1] = d[i + 1] * value + intercept;
-		d[i + 2] = d[i + 2] * value + intercept;
+		d[i]     = d[i]     * amount + intercept;
+		d[i + 1] = d[i + 1] * amount + intercept;
+		d[i + 2] = d[i + 2] * amount + intercept;
 	}
 }
-function applyGrayscaleFilter(d, value)
+function applyGrayscaleFilter(d, amount)
 {
-	var s = 1 - value;
+	var s = 1 - amount;
 
 	applyFilterMatrix(d,
 		[0.2126 + 0.7874*s, 0.7152 - 0.7152*s, 0.0722 - 0.0722*s],
 		[0.2126 - 0.2126*s, 0.7152 + 0.2848*s, 0.0722 - 0.0722*s],
 		[0.2126 - 0.2126*s, 0.7152 - 0.7152*s, 0.0722 + 0.9278*s]);
 }
-function applyHueRotateFilter(d, value)
+function applyHueRotateFilter(d, amount)
 {
-	value *= Math.PI / 180; // Convert degrees to radians
+	amount *= Math.PI / 180; // Convert degrees to radians
 
-	var c = Math.cos(value);
-	var s = Math.sin(value);
+	var c = Math.cos(amount);
+	var s = Math.sin(amount);
 
 	applyFilterMatrix(d,
 		[0.213 + 0.787*c - 0.213*s, 0.715 - 0.715*c - 0.715*s, 0.072 - 0.072*c + 0.928*s],
 		[0.213 - 0.213*c + 0.143*s, 0.715 + 0.285*c + 0.140*s, 0.072 - 0.072*c - 0.283*s],
 		[0.213 - 0.213*c - 0.787*s, 0.715 - 0.715*c + 0.715*s, 0.072 + 0.928*c + 0.072*s]);
 }
-function applyInvertFilter(d, value)
+function applyInvertFilter(d, amount)
 {
-	var m = 1.0 - value - value;
-	var c = 255 * value;
+	var m = 1.0 - amount - amount;
+	var c = 255 * amount;
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
@@ -1073,18 +1078,18 @@ function applyInvertFilter(d, value)
 		d[i + 2] = d[i + 2] * m + c;
 	}
 }
-function applySaturateFilter(d, value)
+function applySaturateFilter(d, amount)
 {
-	var s = value;
+	var s = amount;
 
 	applyFilterMatrix(d,
 		[0.213 + 0.787*s, 0.715 - 0.715*s, 0.072 - 0.072*s],
 		[0.213 - 0.213*s, 0.715 + 0.285*s, 0.072 - 0.072*s],
 		[0.213 - 0.213*s, 0.715 - 0.715*s, 0.072 + 0.928*s]);
 }
-function applySepiaFilter(d, value)
+function applySepiaFilter(d, amount)
 {
-	var s = 1 - value;
+	var s = 1 - amount;
 
 	applyFilterMatrix(d,
 		[0.393 + 0.607*s, 0.769 - 0.769*s, 0.189 - 0.189*s],
@@ -1135,21 +1140,9 @@ function saveImage(event)
 	for (var filter of filters)
 	{
 		var option = filterOptions[filter.selectElement.selectedIndex];
+		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
 
-		if (option.name === "brightness")
-			applyBrightnessFilter(imageData.data, filter.value / 100);
-		else if (option.name === "contrast")
-			applyContrastFilter(imageData.data, filter.value / 100);
-		else if (option.name === "grayscale")
-			applyGrayscaleFilter(imageData.data, filter.value / 100);
-		else if (option.name === "hue-rotate")
-			applyHueRotateFilter(imageData.data, filter.value);
-		else if (option.name === "invert")
-			applyInvertFilter(imageData.data, filter.value / 100);
-		else if (option.name === "saturate")
-			applySaturateFilter(imageData.data, filter.value / 100);
-		else if (option.name === "sepia")
-			applySepiaFilter(imageData.data, filter.value / 100);
+		imageData = option.applyFilter(context, imageData, amount);
 	}
 
 	context.putImageData(imageData, 0, 0);
@@ -1168,23 +1161,31 @@ function saveImage(event)
 		downloadLink.href = canvas.toDataURL(downloadType, downloadQuality);
 	}
 }
-function FilterOption(name, unit, defaultValue, minValue, maxValue)
+function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter)
 {
 	this.name = name;
 	this.unit = unit;
 	this.defaultValue = defaultValue;
 	this.minValue = minValue;
 	this.maxValue = maxValue;
+	this.applyFilter = applyFilter;
+}
+function simpleFilter(applyFilter)
+{
+	return function(context, imageData, amount) {
+		applyFilter(imageData.data, amount);
+		return imageData;
+	}
 }
 var filterOptions = [
-	new FilterOption('blur',       'px',    0, 0,   20),
-	new FilterOption('brightness', '%',   100, 0, 2000),
-	new FilterOption('contrast',   '%',   100, 0,  800),
-	new FilterOption('grayscale',  '%',     0, 0,  100),
-	new FilterOption('hue-rotate', 'deg',   0, 0,  360),
-	new FilterOption('invert',     '%',     0, 0,  100),
-	new FilterOption('saturate',   '%',   100, 0, 1000),
-	new FilterOption('sepia',      '%',     0, 0,  100)
+	new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter),
+	new FilterOption('brightness', '%',   100, 0, 2000, simpleFilter(applyBrightnessFilter)),
+	new FilterOption('contrast',   '%',   100, 0,  800, simpleFilter(applyContrastFilter)),
+	new FilterOption('grayscale',  '%',     0, 0,  100, simpleFilter(applyGrayscaleFilter)),
+	new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter)),
+	new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter)),
+	new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter)),
+	new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter))
 ];
 function Filter(selectElement, sliderElement, inputElement, textNode)
 {
@@ -1201,8 +1202,10 @@ function applyFilters()
 	for (var filter of filters)
 	{
 		var option = filterOptions[filter.selectElement.selectedIndex];
-
-		filterList.push(option.name + '(' + filter.value + option.unit + ')');
+		if (option.name.charAt(0) === '#')
+			filterList.push('url(' + option.name + ')');
+		else
+			filterList.push(option.name + '(' + filter.value + option.unit + ')');
 	}
 	var filterStyle = filterList.join(' ');
 	photo.style.webkitFilter = filterStyle;
