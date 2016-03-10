@@ -68,27 +68,27 @@ function boxBlur(blurInfo, radiusType, vertical)
 			k += delta;
 		}
 		for (var x = 0; x <= leftRadius; ++x) {
-			if (blurR) { sumR += src[k  ] - firstR; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
-			if (blurG) { sumG += src[k+1] - firstG; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
-			if (blurB) { sumB += src[k+2] - firstB; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
-			if (blurA) { sumA += src[k+3] - firstA; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
+			if (blurR) { sumR += src[k  ] - firstR; d[i  ] = sumR / size; }
+			if (blurG) { sumG += src[k+1] - firstG; d[i+1] = sumG / size; }
+			if (blurB) { sumB += src[k+2] - firstB; d[i+2] = sumB / size; }
+			if (blurA) { sumA += src[k+3] - firstA; d[i+3] = sumA / size; }
 			k += delta;
 			i += delta;
 		}
 		for (var x = width; x > 0; --x) {
-			if (blurR) { sumR += src[k  ] - src[j  ]; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
-			if (blurG) { sumG += src[k+1] - src[j+1]; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
-			if (blurB) { sumB += src[k+2] - src[j+2]; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
-			if (blurA) { sumA += src[k+3] - src[j+3]; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
+			if (blurR) { sumR += src[k  ] - src[j  ]; d[i  ] = sumR / size; }
+			if (blurG) { sumG += src[k+1] - src[j+1]; d[i+1] = sumG / size; }
+			if (blurB) { sumB += src[k+2] - src[j+2]; d[i+2] = sumB / size; }
+			if (blurA) { sumA += src[k+3] - src[j+3]; d[i+3] = sumA / size; }
 			j += delta;
 			k += delta;
 			i += delta;
 		}
 		for (var x = 0; x < rightRadius; ++x) {
-			if (blurR) { sumR += lastR - src[j  ]; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
-			if (blurG) { sumG += lastG - src[j+1]; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
-			if (blurB) { sumB += lastB - src[j+2]; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
-			if (blurA) { sumA += lastA - src[j+3]; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
+			if (blurR) { sumR += lastR - src[j  ]; d[i  ] = sumR / size; }
+			if (blurG) { sumG += lastG - src[j+1]; d[i+1] = sumG / size; }
+			if (blurB) { sumB += lastB - src[j+2]; d[i+2] = sumB / size; }
+			if (blurA) { sumA += lastA - src[j+3]; d[i+3] = sumA / size; }
 			j += delta;
 			i += delta;
 		}
@@ -169,6 +169,24 @@ function getBoxBlurSizes2(blurInfo, radiusType)
 		blurInfo[radiusType + i + 'Right'] = radius + 1;
 	}
 }
+function copyUnchangedData(blurInfo)
+{
+	var copyR = !blurInfo.blurR;
+	var copyG = !blurInfo.blurG;
+	var copyB = !blurInfo.blurB;
+	var copyA = !blurInfo.blurA;
+
+	var src = blurInfo.outData.data;
+	var d = blurInfo.inData.data;
+
+	for (var i = 0; i < d.length; i += 4)
+	{
+		if (copyR) d[i  ] = src[i  ];
+		if (copyG) d[i+1] = src[i+1];
+		if (copyB) d[i+2] = src[i+2];
+		if (copyA) d[i+3] = src[i+3];
+	}
+}
 function blur(blurInfo)
 {
 	getBoxBlurSizes1(blurInfo, 'xRadius');
@@ -183,12 +201,16 @@ function blur(blurInfo)
 	boxBlur(blurInfo, 'xRadius3', false);
 	boxBlur(blurInfo, 'yRadius3', true);
 
+	if (!blurInfo.blurAll && blurInfo.inData === blurInfo.newData)
+		copyUnchangedData(blurInfo);
+
 	return blurInfo.inData;
 }
 function BlurInfo(context, inData, xRadius, yRadius, channels, edgeMode)
 {
 	this.inData = inData;
 	this.outData = context.createImageData(inData);
+	this.newData = this.outData;
 
 	this.xRadius = xRadius;
 	this.yRadius = yRadius;
@@ -200,6 +222,8 @@ function BlurInfo(context, inData, xRadius, yRadius, channels, edgeMode)
 
 	for (var channel of channels)
 		this['blur' + channel] = true;
+
+	this.blurAll = this.blurR && this.blurG && this.blurB && this.blurA;
 }
 function applyBlur(context, imageData, xRadius, yRadius, channels, edgeMode)
 {
