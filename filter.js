@@ -47,10 +47,10 @@ function boxBlur(blurInfo, radiusType, vertical)
 
 		if (edgeMode === 0) {
 			// edgeMode is "none"
-			firstR = lastR = 0; sumR = 0;
-			firstG = lastG = 0; sumG = 0;
-			firstB = lastB = 0; sumB = 0;
-			firstA = lastA = 0; sumA = 0;
+			firstR = lastR = 0; sumR = firstR * m;
+			firstG = lastG = 0; sumG = firstG * m;
+			firstB = lastB = 0; sumB = firstB * m;
+			firstA = lastA = 0; sumA = firstA * m;
 		} else {
 			// edgeMode is "duplicate"
 			var z = i + zDelta;
@@ -68,27 +68,27 @@ function boxBlur(blurInfo, radiusType, vertical)
 			k += delta;
 		}
 		for (var x = 0; x <= leftRadius; ++x) {
-			if (blurR) { sumR += src[k  ] - firstR; d[i  ] = sumR / size; }
-			if (blurG) { sumG += src[k+1] - firstG; d[i+1] = sumG / size; }
-			if (blurB) { sumB += src[k+2] - firstB; d[i+2] = sumB / size; }
-			if (blurA) { sumA += src[k+3] - firstA; d[i+3] = sumA / size; }
+			if (blurR) { sumR += src[k  ] - firstR; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
+			if (blurG) { sumG += src[k+1] - firstG; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
+			if (blurB) { sumB += src[k+2] - firstB; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
+			if (blurA) { sumA += src[k+3] - firstA; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
 			k += delta;
 			i += delta;
 		}
 		for (var x = width; x > 0; --x) {
-			if (blurR) { sumR += src[k  ] - src[j  ]; d[i  ] = sumR / size; }
-			if (blurG) { sumG += src[k+1] - src[j+1]; d[i+1] = sumG / size; }
-			if (blurB) { sumB += src[k+2] - src[j+2]; d[i+2] = sumB / size; }
-			if (blurA) { sumA += src[k+3] - src[j+3]; d[i+3] = sumA / size; }
+			if (blurR) { sumR += src[k  ] - src[j  ]; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
+			if (blurG) { sumG += src[k+1] - src[j+1]; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
+			if (blurB) { sumB += src[k+2] - src[j+2]; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
+			if (blurA) { sumA += src[k+3] - src[j+3]; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
 			j += delta;
 			k += delta;
 			i += delta;
 		}
 		for (var x = 0; x < rightRadius; ++x) {
-			if (blurR) { sumR += lastR - src[j  ]; d[i  ] = sumR / size; }
-			if (blurG) { sumG += lastG - src[j+1]; d[i+1] = sumG / size; }
-			if (blurB) { sumB += lastB - src[j+2]; d[i+2] = sumB / size; }
-			if (blurA) { sumA += lastA - src[j+3]; d[i+3] = sumA / size; }
+			if (blurR) { sumR += lastR - src[j  ]; d[i  ] = sumR / size; } else d[i  ] = src[i  ];
+			if (blurG) { sumG += lastG - src[j+1]; d[i+1] = sumG / size; } else d[i+1] = src[i+1];
+			if (blurB) { sumB += lastB - src[j+2]; d[i+2] = sumB / size; } else d[i+2] = src[i+2];
+			if (blurA) { sumA += lastA - src[j+3]; d[i+3] = sumA / size; } else d[i+3] = src[i+3];
 			j += delta;
 			i += delta;
 		}
@@ -97,6 +97,15 @@ function boxBlur(blurInfo, radiusType, vertical)
 
 	blurInfo.inData = blurInfo.outData;
 	blurInfo.outData = inData;
+}
+function printBlurRadii(blurInfo)
+{
+	var prefixes = ['xRadius', 'yRadius'];
+	var suffixes = ['1Left', '1Right', '2Left', '2Right', '3Left', '3Right'];
+
+	for (var prefix of prefixes)
+		for (var suffix of suffixes)
+			console.log(prefix + suffix + " = " + blurInfo[prefix + suffix]);
 }
 function getBoxBlurSizes1(blurInfo, radiusType)
 {
@@ -109,7 +118,7 @@ function getBoxBlurSizes1(blurInfo, radiusType)
 
 	var suffixes = ['1Left', '1Right', '2Left', '2Right', '3Left', '3Right'];
 
-	if (boxBlurSize & 1 === 1) {
+	if ((boxBlurSize & 1) === 1) {
 		// If boxBlurSize is odd:
 		// Use three box blurs of size boxBlurSize centered on the output pixel.
 
@@ -138,6 +147,27 @@ function getBoxBlurSizes2(blurInfo, radiusType)
 {
 	// This function determines the sizes for 3 successive box blurs according to
 	// http://www.peterkovesi.com/papers/FastGaussianSmoothing.pdf
+
+	var radius = blurInfo[radiusType];
+
+	var n = 3;
+	var w = Math.floor(Math.sqrt(12*radius*radius/n + 1));
+
+	if ((w & 1) === 0) w -= 1; // If w is even, subtract 1 to make it odd.
+
+	var m = Math.round((12*radius*radius - n*w*w - 4*n*w - 3*n) / (-4*w - 4));
+
+	radius = (w - 1) / 2;
+
+	var i = 1;
+	for (; i <= m; ++i) {
+		blurInfo[radiusType + i + 'Left'] = radius;
+		blurInfo[radiusType + i + 'Right'] = radius;
+	}
+	for (; i <= n; ++i) {
+		blurInfo[radiusType + i + 'Left'] = radius + 1;
+		blurInfo[radiusType + i + 'Right'] = radius + 1;
+	}
 }
 function blur(blurInfo)
 {
@@ -155,52 +185,29 @@ function blur(blurInfo)
 
 	return blurInfo.inData;
 }
-function BlurInfo(context, inData, radius)
+function BlurInfo(context, inData, xRadius, yRadius, channels, edgeMode)
 {
 	this.inData = inData;
 	this.outData = context.createImageData(inData);
 
-	this.xRadius = radius;
-	this.yRadius = radius;
-	this.edgeMode = 1; // duplicate
-	this.blurR = true;
-	this.blurG = true;
-	this.blurB = true;
-	this.blurA = true;
+	this.xRadius = xRadius;
+	this.yRadius = yRadius;
+	this.edgeMode = edgeMode;
+	this.blurR = false;
+	this.blurG = false;
+	this.blurB = false;
+	this.blurA = false;
+
+	for (var channel of channels)
+		this['blur' + channel] = true;
+}
+function applyBlur(context, imageData, xRadius, yRadius, channels, edgeMode)
+{
+	var blurInfo = new BlurInfo(context, imageData, xRadius, yRadius, channels, edgeMode);
+
+	return blur(blurInfo);
 }
 function applyBlurFilter(context, imageData, radius)
 {
-	var blurInfo = new BlurInfo(context, imageData, radius);
-
-	return blur(blurInfo);
-}
-function applyBlurRed(context, imageData, radius)
-{
-	var blurInfo = new BlurInfo(context, imageData, radius);
-
-	blurInfo.blurG = false;
-	blurInfo.blurB = false;
-	blurInfo.blurA = false;
-
-	return blur(blurInfo);
-}
-function applyBlurGreen(context, imageData, radius)
-{
-	var blurInfo = new BlurInfo(context, imageData, radius);
-
-	blurInfo.blurR = false;
-	blurInfo.blurB = false;
-	blurInfo.blurA = false;
-
-	return blur(blurInfo);
-}
-function applyBlurBlue(context, imageData, radius)
-{
-	var blurInfo = new BlurInfo(context, imageData, radius);
-
-	blurInfo.blurR = false;
-	blurInfo.blurG = false;
-	blurInfo.blurA = false;
-
-	return blur(blurInfo);
+	return applyBlur(context, imageData, radius, radius, 'RGBA', 1);
 }
