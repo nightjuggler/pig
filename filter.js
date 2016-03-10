@@ -13,15 +13,15 @@ function boxBlur(blurInfo, radiusType, vertical)
 	var width = inData.width;
 	var height = inData.height;
 
-	var delta = 4; // the number of data array elements to skip to get to the next pixel
-	var vDelta = 4 * width;
+	// delta = the number of data array elements to skip to get to the next pixel in the X direction
+	// vDelta = the number of data array elements to skip to get to the next pixel in the Y direction
+
+	var delta = 4;
+	var vDelta = delta * width;
 
 	if (vertical) {
-		delta = vDelta;
-		vDelta = 4;
-
-		width = height;
-		height = inData.width;
+		[width, height] = [height, width]; // Swap width and height
+		[delta, vDelta] = [vDelta, delta]; // Swap delta and vDelta
 	}
 
 	var m = leftRadius + 1;
