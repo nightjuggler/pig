@@ -1161,8 +1161,7 @@ function saveImage(event)
 		downloadLink.href = canvas.toDataURL(downloadType, downloadQuality);
 	}
 }
-function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter,
-	svgOnly=false, createSVGFilter=null)
+function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter, svgOnly, createSVGFilter)
 {
 	this.name = name;
 	this.unit = unit;
@@ -1200,7 +1199,7 @@ function Filter(selectElement, sliderElement, inputElement, textNode)
 	this.sliderElement = sliderElement;
 	this.inputElement = inputElement;
 	this.textNode = textNode;
-	this.value = inputElement.value;
+	this.value = parseInt(inputElement.value, 10);
 	this.tableRow = selectElement.parentNode.parentNode;
 	this.id = 0;
 }
@@ -1268,6 +1267,50 @@ function changeFilterValue(event)
 		}
 		applyFilters();
 	}
+}
+function handleSliderKeyDown(event)
+{
+	var key = event.key || event.keyIdentifier;
+	if (key === 'Tab' || key === 'U+0009')
+		return true;
+
+	event.preventDefault();
+	event.stopPropagation();
+
+	var sliderElement = event.currentTarget;
+	var tableRow = sliderElement.parentNode.parentNode;
+
+	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
+	var option = filterOptions[filter.selectElement.selectedIndex];
+
+	var value = filter.value;
+	var step = Math.min(10, Math.max(1, Math.floor((option.maxValue - option.minValue) / 20)));
+
+	if (key === 'ArrowLeft' || key === 'Left') {
+		if (value === option.minValue)
+			return false;
+		value -= step;
+		if (value < option.minValue)
+			value = option.minValue;
+	} else if (key === 'ArrowRight' || key === 'Right') {
+		if (value === option.maxValue)
+			return false;
+		value += step;
+		if (value > option.maxValue)
+			value = option.maxValue;
+	} else
+		return false;
+
+	filter.value = value;
+	filter.inputElement.value = value;
+	filter.sliderElement.value = value;
+
+	if (filter.id !== 0) {
+		removeSVGFilter(filter.id);
+		filter.id = option.createSVGFilter(value);
+	}
+	applyFilters();
+	return false;
 }
 function addFilterRowBefore(event)
 {
@@ -1403,6 +1446,7 @@ function createFilterRow(rowNumber)
 	sliderElement.max = option.maxValue;
 	sliderElement.value = option.defaultValue;
 	sliderElement.addEventListener('change', changeFilterValue, false);
+	sliderElement.addEventListener('keydown', handleSliderKeyDown, false);
 
 	var inputElement = document.createElement('INPUT');
 	inputElement.type = 'text';
