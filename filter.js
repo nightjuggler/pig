@@ -1,3 +1,42 @@
+var svgNS = 'http://www.w3.org/2000/svg';
+var svgFilterId = 0;
+
+function appendSVGFilter(filterNode)
+{
+	var svgNode = document.getElementById('svgRoot');
+	svgNode.firstChild.appendChild(filterNode);
+}
+function removeSVGFilter(id)
+{
+	var filterElement = document.getElementById('filter' + id);
+	filterElement.parentNode.removeChild(filterElement);
+}
+function createSVGBlur(xRadius, yRadius)
+{
+	++svgFilterId;
+	var filterNode = document.createElementNS(svgNS, 'filter');
+	filterNode.setAttribute('id', 'filter' + svgFilterId);
+	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
+
+	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
+	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
+
+	filterNode.appendChild(fe);
+	appendSVGFilter(filterNode);
+	return svgFilterId;
+}
+function createBlurXFilter(amount)
+{
+	return createSVGBlur(amount, 0);
+}
+function createBlurYFilter(amount)
+{
+	return createSVGBlur(0, amount);
+}
+function createBlurFilter(amount)
+{
+	return createSVGBlur(amount, amount);
+}
 function boxBlur(blurInfo, radiusType, vertical)
 {
 	var leftRadius = blurInfo[radiusType + 'Left'];
@@ -234,4 +273,12 @@ function applyBlur(context, imageData, xRadius, yRadius, channels, edgeMode)
 function applyBlurFilter(context, imageData, radius)
 {
 	return applyBlur(context, imageData, radius, radius, 'RGBA', 1);
+}
+function applyBlurXFilter(context, imageData, radius)
+{
+	return applyBlur(context, imageData, radius, 0, 'RGBA', 1);
+}
+function applyBlurYFilter(context, imageData, radius)
+{
+	return applyBlur(context, imageData, 0, radius, 'RGBA', 1);
 }

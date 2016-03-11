@@ -1161,7 +1161,8 @@ function saveImage(event)
 		downloadLink.href = canvas.toDataURL(downloadType, downloadQuality);
 	}
 }
-function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter)
+function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter,
+	svgOnly=false, createSVGFilter=null)
 {
 	this.name = name;
 	this.unit = unit;
@@ -1169,6 +1170,8 @@ function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter)
 	this.minValue = minValue;
 	this.maxValue = maxValue;
 	this.applyFilter = applyFilter;
+	this.svgOnly = svgOnly;
+	this.createSVGFilter = createSVGFilter;
 }
 function simpleFilter(applyFilter)
 {
@@ -1185,7 +1188,11 @@ var filterOptions = [
 	new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter)),
 	new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter)),
 	new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter)),
-	new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter))
+	new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter)),
+	new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,
+		true, createBlurXFilter),
+	new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,
+		true, createBlurYFilter)
 ];
 function Filter(selectElement, sliderElement, inputElement, textNode)
 {
@@ -1195,6 +1202,7 @@ function Filter(selectElement, sliderElement, inputElement, textNode)
 	this.textNode = textNode;
 	this.value = inputElement.value;
 	this.tableRow = selectElement.parentNode.parentNode;
+	this.id = 0;
 }
 function applyFilters()
 {
@@ -1202,10 +1210,10 @@ function applyFilters()
 	for (var filter of filters)
 	{
 		var option = filterOptions[filter.selectElement.selectedIndex];
-		if (option.name.charAt(0) === '#')
-			filterList.push('url(' + option.name + ')');
-		else
+		if (filter.id === 0)
 			filterList.push(option.name + '(' + filter.value + option.unit + ')');
+		else
+			filterList.push('url(#filter' + filter.id + ')');
 	}
 	var filterStyle = filterList.join(' ');
 	photo.style.webkitFilter = filterStyle;
@@ -1227,6 +1235,13 @@ function changeFilterName(event)
 	filter.inputElement.value = option.defaultValue;
 	filter.textNode.nodeValue = option.unit;
 
+	if (filter.id !== 0) {
+		removeSVGFilter(filter.id);
+		filter.id = 0;
+	}
+	if (option.svgOnly)
+		filter.id = option.createSVGFilter(filter.value);
+
 	applyFilters();
 }
 function changeFilterValue(event)
@@ -1241,12 +1256,16 @@ function changeFilterValue(event)
 
 	if (isNaN(value) || value != inputElement.value || value < option.minValue || value > option.maxValue) {
 		inputElement.value = filter.value;
-	} else {
-		filter.value = inputElement.value;
+	} else if (value != filter.value) {
+		filter.value = value;
 		if (inputElement === filter.sliderElement)
-			filter.inputElement.value = filter.value;
+			filter.inputElement.value = value;
 		else
-			filter.sliderElement.value = filter.value;
+			filter.sliderElement.value = value;
+		if (filter.id !== 0) {
+			removeSVGFilter(filter.id);
+			filter.id = option.createSVGFilter(value);
+		}
 		applyFilters();
 	}
 }
@@ -1304,6 +1323,10 @@ function removeFilterRow(event)
 	var rowNumber = parseInt(tableRow.id.substr(9), 10); // e.g. filterRow0
 
 	tableRow.parentNode.removeChild(tableRow);
+
+	var filterId = filters[rowNumber].id;
+	if (filterId !== 0)
+		removeSVGFilter(filterId);
 
 	for (var i = rowNumber; i < filters.length - 1; ++i)
 	{
@@ -1554,5 +1577,6 @@ Crop Inverse Aspect Ratio
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
 <canvas id="canvas"></canvas>
+<svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
 </body>
 </html>
