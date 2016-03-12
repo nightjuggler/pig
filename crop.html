@@ -208,6 +208,7 @@ var controlDiv;
 var imageNames;
 var imageFiles;
 var filters = [];
+var filterIndex = {};
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
 var downloadLink;                // the HTML <a> element for the Save link
@@ -767,6 +768,7 @@ function rotatePhoto(angle)
 	var oldCropperTop = cropperTop - photoMinY;
 	if (angle === 90 || angle === 270) {
 		turnPhotoDiv();
+		swapXYFilters();
 		var width = cropperWidth;
 		var height = cropperHeight;
 		cropperWidth = height;
@@ -1203,6 +1205,32 @@ function Filter(selectElement, sliderElement, inputElement, textNode)
 	this.tableRow = selectElement.parentNode.parentNode;
 	this.id = 0;
 }
+function swapXYFilters()
+{
+	for (var option of filterOptions)
+	{
+		var name = option.name;
+		if (name.substr(-2) === '-x') {
+			var swapName = name.substr(0, name.length - 1) + 'y';
+			option.swapIndex = filterIndex[swapName];
+
+			var swapOption = filterOptions[option.swapIndex];
+			swapOption.swapIndex = filterIndex[option.name];
+
+			var createSVGFilter = option.createSVGFilter;
+			option.createSVGFilter = swapOption.createSVGFilter;
+			swapOption.createSVGFilter = createSVGFilter;
+		} else if (name.substr(-2) !== '-y') {
+			option.swapIndex = null;
+		}
+	}
+	for (var filter of filters)
+	{
+		var option = filterOptions[filter.selectElement.selectedIndex];
+		if (option.swapIndex !== null)
+			filter.selectElement.selectedIndex = option.swapIndex;
+	}
+}
 function applyFilters()
 {
 	var filterList = [];
@@ -1438,7 +1466,7 @@ function createFilterRow(rowNumber)
 	for (var option of filterOptions)
 		selectElement.add(new Option(option.name, option.name, false, false));
 
-	option = filterOptions[selectElement.selectedIndex = 2];
+	option = filterOptions[selectElement.selectedIndex = filterIndex['contrast']];
 
 	var sliderElement = document.createElement('INPUT');
 	sliderElement.type = 'range';
@@ -1476,6 +1504,9 @@ function createFilterRow(rowNumber)
 }
 function createFilterDiv()
 {
+	for (var i = 0; i < filterOptions.length; ++i)
+		filterIndex[filterOptions[i].name] = i;
+
 	var tableRow = createFilterRow(0);
 
 	var table = document.createElement('TABLE');
