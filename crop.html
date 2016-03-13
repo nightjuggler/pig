@@ -152,7 +152,7 @@ a:hover {
 }
 input[type="range"] {
 	vertical-align: middle;
-	width: 180px;
+	width: 160px;
 }
 #canvas {
 	border: 4px solid black;
@@ -161,6 +161,27 @@ input[type="range"] {
 }
 #downloadLink {
 	display: none;
+}
+.channelOn {
+	border: 2px inset black;
+	cursor: pointer;
+	padding: 2px;
+}
+.channelOff {
+	background-color: rgb(230,230,230);
+	border: 2px outset black;
+	color: rgb(160,160,160);
+	cursor: pointer;
+	padding: 2px;
+}
+.channelR {
+	color: rgb(238,0,0);
+}
+.channelG {
+	color: rgb(0,238,0);
+}
+.channelB {
+	color: rgb(0,0,238);
 }
 </style>
 <script src="cropList.js"></script>
@@ -1006,8 +1027,12 @@ function applyFullFilterMatrix(d, a0, a1, a2, a3)
 		d[i + 3] = a3[0] * r + a3[1] * g + a3[2] * b + a3[3] * a + a3[4] * 255;
 	}
 }
-function applyFilterMatrix(d, a0, a1, a2)
+function applyFilterMatrix(d, channels, a0, a1, a2)
 {
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
@@ -1015,23 +1040,31 @@ function applyFilterMatrix(d, a0, a1, a2)
 		var g = d[i + 1];
 		var b = d[i + 2];
 
-		d[i]     = a0[0] * r + a0[1] * g + a0[2] * b;
-		d[i + 1] = a1[0] * r + a1[1] * g + a1[2] * b;
-		d[i + 2] = a2[0] * r + a2[1] * g + a2[2] * b;
+		if (setR) d[i]     = a0[0] * r + a0[1] * g + a0[2] * b;
+		if (setG) d[i + 1] = a1[0] * r + a1[1] * g + a1[2] * b;
+		if (setB) d[i + 2] = a2[0] * r + a2[1] * g + a2[2] * b;
 	}
 }
-function applyBrightnessFilter(d, amount)
+function applyBrightnessFilter(d, amount, channels)
 {
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
-		d[i]     *= amount;
-		d[i + 1] *= amount;
-		d[i + 2] *= amount;
+		if (setR) d[i]     *= amount;
+		if (setG) d[i + 1] *= amount;
+		if (setB) d[i + 2] *= amount;
 	}
 }
-function applyContrastFilter(d, amount)
+function applyContrastFilter(d, amount, channels)
 {
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
 	// V' = C * (V - 0.5) + 0.5
 	// where C = amount of contrast, V = current channel value, and V' = new channel value
 	// Thus V' = V*C + 0.5 - 0.5*C
@@ -1041,59 +1074,63 @@ function applyContrastFilter(d, amount)
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
-		d[i]     = d[i]     * amount + intercept;
-		d[i + 1] = d[i + 1] * amount + intercept;
-		d[i + 2] = d[i + 2] * amount + intercept;
+		if (setR) d[i]     = d[i]     * amount + intercept;
+		if (setG) d[i + 1] = d[i + 1] * amount + intercept;
+		if (setB) d[i + 2] = d[i + 2] * amount + intercept;
 	}
 }
-function applyGrayscaleFilter(d, amount)
+function applyGrayscaleFilter(d, amount, channels)
 {
 	var s = 1 - amount;
 
-	applyFilterMatrix(d,
+	applyFilterMatrix(d, channels,
 		[0.2126 + 0.7874*s, 0.7152 - 0.7152*s, 0.0722 - 0.0722*s],
 		[0.2126 - 0.2126*s, 0.7152 + 0.2848*s, 0.0722 - 0.0722*s],
 		[0.2126 - 0.2126*s, 0.7152 - 0.7152*s, 0.0722 + 0.9278*s]);
 }
-function applyHueRotateFilter(d, amount)
+function applyHueRotateFilter(d, amount, channels)
 {
 	amount *= Math.PI / 180; // Convert degrees to radians
 
 	var c = Math.cos(amount);
 	var s = Math.sin(amount);
 
-	applyFilterMatrix(d,
+	applyFilterMatrix(d, channels,
 		[0.213 + 0.787*c - 0.213*s, 0.715 - 0.715*c - 0.715*s, 0.072 - 0.072*c + 0.928*s],
 		[0.213 - 0.213*c + 0.143*s, 0.715 + 0.285*c + 0.140*s, 0.072 - 0.072*c - 0.283*s],
 		[0.213 - 0.213*c - 0.787*s, 0.715 - 0.715*c + 0.715*s, 0.072 + 0.928*c + 0.072*s]);
 }
-function applyInvertFilter(d, amount)
+function applyInvertFilter(d, amount, channels)
 {
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
 	var m = 1.0 - amount - amount;
 	var c = 255 * amount;
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
 	{
-		d[i]     = d[i]     * m + c;
-		d[i + 1] = d[i + 1] * m + c;
-		d[i + 2] = d[i + 2] * m + c;
+		if (setR) d[i]     = d[i]     * m + c;
+		if (setG) d[i + 1] = d[i + 1] * m + c;
+		if (setB) d[i + 2] = d[i + 2] * m + c;
 	}
 }
-function applySaturateFilter(d, amount)
+function applySaturateFilter(d, amount, channels)
 {
 	var s = amount;
 
-	applyFilterMatrix(d,
+	applyFilterMatrix(d, channels,
 		[0.213 + 0.787*s, 0.715 - 0.715*s, 0.072 - 0.072*s],
 		[0.213 - 0.213*s, 0.715 + 0.285*s, 0.072 - 0.072*s],
 		[0.213 - 0.213*s, 0.715 - 0.715*s, 0.072 + 0.928*s]);
 }
-function applySepiaFilter(d, amount)
+function applySepiaFilter(d, amount, channels)
 {
 	var s = 1 - amount;
 
-	applyFilterMatrix(d,
+	applyFilterMatrix(d, channels,
 		[0.393 + 0.607*s, 0.769 - 0.769*s, 0.189 - 0.189*s],
 		[0.349 - 0.349*s, 0.686 + 0.314*s, 0.168 - 0.168*s],
 		[0.272 - 0.272*s, 0.534 - 0.534*s, 0.131 + 0.869*s]);
@@ -1142,9 +1179,13 @@ function saveImage(event)
 	for (var filter of filters)
 	{
 		var option = filterOptions[filter.selectElement.selectedIndex];
+
+		if (filter.value === option.defaultValue || filter.channels === 0)
+			continue;
+
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
 
-		imageData = option.applyFilter(context, imageData, amount);
+		imageData = option.applyFilter(context, imageData, amount, filter.channels);
 	}
 
 	context.putImageData(imageData, 0, 0);
@@ -1176,33 +1217,32 @@ function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter,
 }
 function simpleFilter(applyFilter)
 {
-	return function(context, imageData, amount) {
-		applyFilter(imageData.data, amount);
+	return function(context, imageData, amount, channels) {
+		applyFilter(imageData.data, amount, channels);
 		return imageData;
 	}
 }
 var filterOptions = [
-	new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter),
-	new FilterOption('brightness', '%',   100, 0, 2000, simpleFilter(applyBrightnessFilter)),
-	new FilterOption('contrast',   '%',   100, 0,  800, simpleFilter(applyContrastFilter)),
-	new FilterOption('grayscale',  '%',     0, 0,  100, simpleFilter(applyGrayscaleFilter)),
-	new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter)),
-	new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter)),
-	new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter)),
-	new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter)),
-	new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,
-		true, createBlurXFilter),
-	new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,
-		true, createBlurYFilter)
+new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     false, createBlurFilter),
+new FilterOption('brightness', '%',   100, 0, 2000, simpleFilter(applyBrightnessFilter), false, createSVGBrightness),
+new FilterOption('contrast',   '%',   100, 0,  800, simpleFilter(applyContrastFilter),   false, createSVGContrast),
+new FilterOption('grayscale',  '%',     0, 0,  100, simpleFilter(applyGrayscaleFilter),  false, createSVGGrayscale),
+new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter),  false, createSVGHueRotate),
+new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
+new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter),   false, createSVGSaturate),
+new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter),      false, createSVGSepia),
+new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
+new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter)
 ];
 function Filter(selectElement, sliderElement, inputElement, textNode)
 {
 	this.selectElement = selectElement;
 	this.sliderElement = sliderElement;
 	this.inputElement = inputElement;
+	this.tableRow = selectElement.parentNode.parentNode;
 	this.textNode = textNode;
 	this.value = parseInt(inputElement.value, 10);
-	this.tableRow = selectElement.parentNode.parentNode;
+	this.channels = 7;
 	this.id = 0;
 }
 function swapXYFilters()
@@ -1237,14 +1277,32 @@ function applyFilters()
 	for (var filter of filters)
 	{
 		var option = filterOptions[filter.selectElement.selectedIndex];
+		if (filter.value === option.defaultValue || filter.channels === 0)
+			continue;
 		if (filter.id === 0)
 			filterList.push(option.name + '(' + filter.value + option.unit + ')');
 		else
 			filterList.push('url(#filter' + filter.id + ')');
 	}
-	var filterStyle = filterList.join(' ');
+	var filterStyle = filterList.length === 0 ? 'none' : filterList.join(' ');
 	photo.style.webkitFilter = filterStyle;
 	photo.style.filter = filterStyle;
+}
+function manageFilters(filter, option)
+{
+	if (filter.id !== 0)
+	{
+		removeSVGFilter(filter.id);
+		filter.id = 0;
+	}
+	if (filter.value !== option.defaultValue && filter.channels > 0 &&
+		(option.svgOnly || filter.channels < 7))
+	{
+		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
+
+		filter.id = option.createSVGFilter(amount, filter.channels);
+	}
+	applyFilters();
 }
 function changeFilterName(event)
 {
@@ -1262,14 +1320,7 @@ function changeFilterName(event)
 	filter.inputElement.value = option.defaultValue;
 	filter.textNode.nodeValue = option.unit;
 
-	if (filter.id !== 0) {
-		removeSVGFilter(filter.id);
-		filter.id = 0;
-	}
-	if (option.svgOnly)
-		filter.id = option.createSVGFilter(filter.value);
-
-	applyFilters();
+	manageFilters(filter, option);
 }
 function changeFilterValue(event)
 {
@@ -1289,11 +1340,7 @@ function changeFilterValue(event)
 			filter.inputElement.value = value;
 		else
 			filter.sliderElement.value = value;
-		if (filter.id !== 0) {
-			removeSVGFilter(filter.id);
-			filter.id = option.createSVGFilter(value);
-		}
-		applyFilters();
+		manageFilters(filter, option);
 	}
 }
 function handleSliderKeyDown(event)
@@ -1333,11 +1380,7 @@ function handleSliderKeyDown(event)
 	filter.inputElement.value = value;
 	filter.sliderElement.value = value;
 
-	if (filter.id !== 0) {
-		removeSVGFilter(filter.id);
-		filter.id = option.createSVGFilter(value);
-	}
-	applyFilters();
+	manageFilters(filter, option);
 	return false;
 }
 function addFilterRowBefore(event)
@@ -1420,6 +1463,35 @@ function removeFilterRow(event)
 
 	applyFilters();
 }
+function selectChannel(event)
+{
+	var span = event.currentTarget;
+	var tableRow = span.parentNode.parentNode;
+	var channel = span.firstChild.nodeValue;
+
+	var filter = filters[parseInt(tableRow.id.substr(9), 10)]; // e.g. filterRow0
+	var option = filterOptions[filter.selectElement.selectedIndex];
+
+	var flag = channel === 'R' ? 1 : channel === 'G' ? 2 : 4;
+
+	if ((filter.channels & flag) === 0) {
+		filter.channels += flag;
+		span.className = 'channelOn channel' + channel;
+	} else {
+		filter.channels -= flag;
+		span.className = 'channelOff';
+	}
+
+	manageFilters(filter, option);
+}
+function createChannelSelector(tableCell, channel)
+{
+	var span = document.createElement('SPAN');
+	span.className = 'channelOn channel' + channel;
+	span.appendChild(document.createTextNode(channel));
+	span.addEventListener('click', selectChannel, false);
+	tableCell.appendChild(span);
+}
 function createClickableText(text, clickHandler)
 {
 	var span = document.createElement('SPAN');
@@ -1487,6 +1559,9 @@ function createFilterRow(rowNumber)
 
 	var tableCell = document.createElement('TD');
 	tableCell.appendChild(selectElement);
+	createChannelSelector(tableCell, 'R');
+	createChannelSelector(tableCell, 'G');
+	createChannelSelector(tableCell, 'B');
 	tableCell.appendChild(sliderElement);
 	tableCell.appendChild(inputElement);
 	tableCell.appendChild(textNode);

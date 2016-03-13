@@ -1,41 +1,176 @@
 var svgNS = 'http://www.w3.org/2000/svg';
 var svgFilterId = 0;
+var channelMap = [['R', 1], ['G', 2], ['B', 4]];
 
-function appendSVGFilter(filterNode)
-{
-	var svgNode = document.getElementById('svgRoot');
-	svgNode.firstChild.appendChild(filterNode);
-}
 function removeSVGFilter(id)
 {
 	var filterElement = document.getElementById('filter' + id);
 	filterElement.parentNode.removeChild(filterElement);
 }
-function createSVGBlur(xRadius, yRadius)
+function createChannelMask(channels, unfiltered)
+{
+	var fe = document.createElementNS(svgNS, 'feComponentTransfer');
+
+	if (unfiltered)
+		fe.setAttribute('in', 'SourceGraphic');
+	else
+		fe.setAttribute('result', 'filtered');
+
+	for (var [letter, flag] of channelMap)
+		if ((channels & flag) === flag)
+		{
+			var feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'linear');
+			feFunc.setAttribute('slope', '0');
+			fe.appendChild(feFunc);
+		}
+
+	return fe;
+}
+function createFilter(channels, fe)
 {
 	++svgFilterId;
 	var filterNode = document.createElementNS(svgNS, 'filter');
 	filterNode.setAttribute('id', 'filter' + svgFilterId);
 	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
-
-	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
-	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
-
 	filterNode.appendChild(fe);
-	appendSVGFilter(filterNode);
+
+	if (channels > 0 && channels < 7)
+	{
+		filterNode.appendChild(createChannelMask(7 - channels, false));
+		filterNode.appendChild(createChannelMask(channels, true));
+
+		fe = document.createElementNS(svgNS, 'feComposite');
+		fe.setAttribute('in2', 'filtered');
+		fe.setAttribute('operator', 'arithmetic');
+		fe.setAttribute('k2', '1');
+		fe.setAttribute('k3', '1');
+		filterNode.appendChild(fe);
+	}
+
+	var svgNode = document.getElementById('svgRoot');
+	svgNode.firstChild.appendChild(filterNode);
 	return svgFilterId;
 }
-function createBlurXFilter(amount)
+function matrixRow(a)
 {
-	return createSVGBlur(amount, 0);
+	return a[0].toFixed(6) + ' ' + a[1].toFixed(6) + ' ' + a[2].toFixed(6);
 }
-function createBlurYFilter(amount)
+function createColorMatrix(channels, a0, a1, a2)
 {
-	return createSVGBlur(0, amount);
+	a0 = (channels & 1) === 1 ? matrixRow(a0) : '1 0 0';
+	a1 = (channels & 2) === 2 ? matrixRow(a1) : '0 1 0';
+	a2 = (channels & 4) === 4 ? matrixRow(a2) : '0 0 1';
+
+	var values = a0 + ' 0 0 ' + a1 + ' 0 0 ' + a2 + ' 0 0 0 0 0 1 0';
+
+	var fe = document.createElementNS(svgNS, 'feColorMatrix');
+	fe.setAttribute('type', 'matrix');
+	fe.setAttribute('values', values);
+	return fe;
 }
-function createBlurFilter(amount)
+function createSVGBrightness(amount, channels)
 {
-	return createSVGBlur(amount, amount);
+	var fe = document.createElementNS(svgNS, 'feComponentTransfer');
+
+	amount = amount.toFixed(6);
+
+	for (var [letter, flag] of channelMap)
+		if ((channels & flag) === flag)
+		{
+			var feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'linear');
+			feFunc.setAttribute('slope', amount);
+			fe.appendChild(feFunc);
+		}
+
+	return createFilter(7, fe);
+}
+function createSVGContrast(amount, channels)
+{
+	var fe = document.createElementNS(svgNS, 'feComponentTransfer');
+
+	var intercept = (0.5 - 0.5 * amount).toFixed(6);
+	amount = amount.toFixed(6);
+
+	for (var [letter, flag] of channelMap)
+		if ((channels & flag) === flag)
+		{
+			var feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'linear');
+			feFunc.setAttribute('slope', amount);
+			feFunc.setAttribute('intercept', intercept);
+			fe.appendChild(feFunc);
+		}
+
+	return createFilter(7, fe);
+}
+function createSVGGrayscale(amount, channels)
+{
+	var s = 1 - amount;
+
+	return createFilter(7, createColorMatrix(channels,
+		[0.2126 + 0.7874*s, 0.7152 - 0.7152*s, 0.0722 - 0.0722*s],
+		[0.2126 - 0.2126*s, 0.7152 + 0.2848*s, 0.0722 - 0.0722*s],
+		[0.2126 - 0.2126*s, 0.7152 - 0.7152*s, 0.0722 + 0.9278*s]));
+}
+function createSVGHueRotate(amount, channels)
+{
+	var fe = document.createElementNS(svgNS, 'feColorMatrix');
+	fe.setAttribute('type', 'hueRotate');
+	fe.setAttribute('values', amount);
+	return createFilter(channels, fe);
+}
+function createSVGInvert(amount, channels)
+{
+	var fe = document.createElementNS(svgNS, 'feComponentTransfer');
+
+	var tableValues = amount.toFixed(6) + ' ' + (1 - amount).toFixed(6);
+
+	for (var [letter, flag] of channelMap)
+		if ((channels & flag) === flag)
+		{
+			var feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'table');
+			feFunc.setAttribute('tableValues', tableValues);
+			fe.appendChild(feFunc);
+		}
+
+	return createFilter(7, fe);
+}
+function createSVGSaturate(amount, channels)
+{
+	var fe = document.createElementNS(svgNS, 'feColorMatrix');
+	fe.setAttribute('type', 'saturate');
+	fe.setAttribute('values', amount.toFixed(6));
+	return createFilter(channels, fe);
+}
+function createSVGSepia(amount, channels)
+{
+	var s = 1 - amount;
+
+	return createFilter(7, createColorMatrix(channels,
+		[0.393 + 0.607*s, 0.769 - 0.769*s, 0.189 - 0.189*s],
+		[0.349 - 0.349*s, 0.686 + 0.314*s, 0.168 - 0.168*s],
+		[0.272 - 0.272*s, 0.534 - 0.534*s, 0.131 + 0.869*s]));
+}
+function createGaussianBlur(xRadius, yRadius)
+{
+	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
+	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
+	return fe;
+}
+function createBlurXFilter(xRadius, channels)
+{
+	return createFilter(channels, createGaussianBlur(xRadius, 0));
+}
+function createBlurYFilter(yRadius, channels)
+{
+	return createFilter(channels, createGaussianBlur(0, yRadius));
+}
+function createBlurFilter(radius, channels)
+{
+	return createFilter(channels, createGaussianBlur(radius, radius));
 }
 function boxBlur(blurInfo, radiusType, vertical)
 {
@@ -259,8 +394,24 @@ function BlurInfo(context, inData, xRadius, yRadius, channels, edgeMode)
 	this.blurB = false;
 	this.blurA = false;
 
-	for (var channel of channels)
-		this['blur' + channel] = true;
+	if (typeof channels === 'number') {
+		if ((channels & 1) === 1) this.blurR = true;
+		if ((channels & 2) === 2) this.blurG = true;
+		if ((channels & 4) === 4) this.blurB = true;
+		if ((channels & 8) === 8) this.blurA = true;
+	} else if (typeof channels === 'string') {
+		for (var channel of channels)
+			switch (channel) {
+				case 'A': this.blurA = true; break;
+				case 'B': this.blurB = true; break;
+				case 'G': this.blurG = true; break;
+				case 'R': this.blurR = true; break;
+			}
+	} else if (typeof channels === 'undefined') {
+		this.blurR = true;
+		this.blurG = true;
+		this.blurB = true;
+	}
 
 	this.blurAll = this.blurR && this.blurG && this.blurB && this.blurA;
 }
@@ -270,15 +421,15 @@ function applyBlur(context, imageData, xRadius, yRadius, channels, edgeMode)
 
 	return blur(blurInfo);
 }
-function applyBlurFilter(context, imageData, radius)
+function applyBlurFilter(context, imageData, radius, channels)
 {
-	return applyBlur(context, imageData, radius, radius, 'RGBA', 1);
+	return applyBlur(context, imageData, radius, radius, channels, 1);
 }
-function applyBlurXFilter(context, imageData, radius)
+function applyBlurXFilter(context, imageData, radius, channels)
 {
-	return applyBlur(context, imageData, radius, 0, 'RGBA', 1);
+	return applyBlur(context, imageData, radius, 0, channels, 1);
 }
-function applyBlurYFilter(context, imageData, radius)
+function applyBlurYFilter(context, imageData, radius, channels)
 {
-	return applyBlur(context, imageData, 0, radius, 'RGBA', 1);
+	return applyBlur(context, imageData, 0, radius, channels, 1);
 }
