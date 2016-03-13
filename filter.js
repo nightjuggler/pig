@@ -1,11 +1,13 @@
 var svgNS = 'http://www.w3.org/2000/svg';
 var svgFilterId = 0;
+var svgFilterIdBin = [];
 var channelMap = [['R', 1], ['G', 2], ['B', 4]];
 
 function removeSVGFilter(id)
 {
 	var filterElement = document.getElementById('filter' + id);
 	filterElement.parentNode.removeChild(filterElement);
+	svgFilterIdBin.push(id);
 }
 function createChannelMask(channels, unfiltered)
 {
@@ -29,9 +31,10 @@ function createChannelMask(channels, unfiltered)
 }
 function createFilter(channels, fe)
 {
-	++svgFilterId;
+	var filterId = svgFilterIdBin.length === 0 ? ++svgFilterId : svgFilterIdBin.pop();
+
 	var filterNode = document.createElementNS(svgNS, 'filter');
-	filterNode.setAttribute('id', 'filter' + svgFilterId);
+	filterNode.setAttribute('id', 'filter' + filterId);
 	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
 	filterNode.appendChild(fe);
 
@@ -50,7 +53,7 @@ function createFilter(channels, fe)
 
 	var svgNode = document.getElementById('svgRoot');
 	svgNode.firstChild.appendChild(filterNode);
-	return svgFilterId;
+	return filterId;
 }
 function matrixRow(a)
 {
