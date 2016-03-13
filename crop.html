@@ -163,25 +163,42 @@ input[type="range"] {
 	display: none;
 }
 .channelOn {
-	border: 2px inset black;
+	border-style: inset;
+	border-width: 1px;
 	cursor: pointer;
 	padding: 2px;
 }
 .channelOff {
 	background-color: rgb(230,230,230);
-	border: 2px outset black;
+	border-style: outset;
+	border-width: 1px;
 	color: rgb(160,160,160);
 	cursor: pointer;
 	padding: 2px;
 }
 .channelR {
-	color: rgb(238,0,0);
+	background-color: rgb(255,0,0); /* Red */
+	color: rgb(255,192,203); /* Pink */
+}
+.channelR:hover {
+	background-color: rgb(255,192,203); /* Pink */
+	color: rgb(255,0,0); /* Red */
 }
 .channelG {
-	color: rgb(0,238,0);
+	background-color: rgb(0,128,0); /* Green */
+	color: rgb(124,252,0); /* LawnGreen */
+}
+.channelG:hover {
+	background-color: rgb(124,252,0); /* LawnGreen */
+	color: rgb(0,128,0); /* Green */
 }
 .channelB {
-	color: rgb(0,0,238);
+	background-color: rgb(0,0,255); /* Blue */
+	color: rgb(0,191,255); /* DeepSkyBlue */
+}
+.channelB:hover {
+	background-color: rgb(0,191,255); /* DeepSkyBlue */
+	color: rgb(0,0,255); /* Blue */
 }
 </style>
 <script src="cropList.js"></script>
