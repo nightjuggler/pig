@@ -63,13 +63,16 @@ input, select {
 	position: absolute;
 }
 code {
-	background-color: rgb(230,230,230);
+	background-color: rgb(245,245,220); /* Beige */
 	border-radius: 10px;
 	display: block;
 	overflow: scroll;
 	padding: 4px;
 	white-space: pre;
 }
+.cT { color: rgb(0,100,0); } /* DarkGreen */
+.cA { color: rgb(128,0,128); } /* Purple */
+.cV { color: rgb(0,0,128); } /* Navy */
 #controlDiv {
 	background-color: rgba(230,230,250,0.8);
 	border: 2px solid black;
@@ -1306,15 +1309,34 @@ function swapXYFilters()
 			filter.selectElement.selectedIndex = option.swapIndex;
 	}
 }
+function markupTag(inData)
+{
+	var k = inData.indexOf(' ');
+	var tag = k < 0 ? inData : inData.substr(0, k);
+	var outData = '<span class="cT">' + tag + '</span>';
+
+	var i = tag.length + 1;
+	while (i < inData.length) {
+		k = inData.indexOf('=', i);
+		outData += ' <span class="cA">' + inData.substr(i, k - i) + '</span>';
+		i = k + 2;
+		k = inData.indexOf('"', i);
+		outData += '=&quot;<span class="cV">' + inData.substr(i, k - i) + '</span>&quot;';
+		i = k + 2;
+	}
+
+	return [tag, outData];
+}
 function showFilterCode(event)
 {
 	event.preventDefault();
 
 	var filterStyle = photo.style.filter || 'none';
-	var css = '-webkit-filter: ' + filterStyle + ';\nfilter: ' + filterStyle + ';\n';
+	var css = '<span class="cT">-webkit-filter</span>: ' + filterStyle +
+		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
 
 	var html = document.getElementById('svgRoot').innerHTML;
-	var svg = '&lt;svg width="0" height="0"&gt;';
+	var svg = '&lt;<span class="cT">svg</span> <span class="cA">width</span>=&quot;<span class="cV">0</span>&quot; <span class="cA">height</span>=&quot;<span class="cV">0</span>&quot;&gt;';
 
 	var j = 0;
 	var indent = 0;
@@ -1326,9 +1348,7 @@ function showFilterCode(event)
 		var k = endTag ? j + 2 : j + 1;
 
 		j = html.indexOf('>', k);
-		var tagData = html.substr(k, j - k);
-		k = tagData.indexOf(' ');
-		var tag = k < 0 ? tagData : tagData.substr(0, k);
+		var [tag, tagData] = markupTag(html.substr(k, j - k));
 
 		if (endTag) {
 			--indent;
@@ -1347,7 +1367,7 @@ function showFilterCode(event)
 		}
 	}
 
-	svg += '\n&lt;/svg&gt;\n';
+	svg += '\n&lt;/<span class="cT">svg</span>&gt;\n';
 
 	var cssCode = document.getElementById("cssCode");
 	var svgCode = document.getElementById("svgCode");
@@ -1795,6 +1815,11 @@ function bodyLoaded()
 <div id="resizeSE"></div>
 </div>
 
+<div id="filterCodeDiv">
+CSS: <code id="cssCode"></code>
+SVG: <code id="svgCode"></code>
+<input type="button" value="Close" onclick="hideFilterCode()" />
+</div>
 <div id="controlDiv">
 Crop Area (Width x Height + X + Y): <input
 	type="text" id="cropWidthField" size="4" value="" onchange="changeCropWidth()" />x<input
@@ -1831,11 +1856,6 @@ Crop Inverse Aspect Ratio
 
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
-<div id="filterCodeDiv">
-CSS: <code id="cssCode"></code>
-SVG: <code id="svgCode"></code>
-<input type="button" value="Close" onclick="hideFilterCode()" />
-</div>
 <canvas id="canvas"></canvas>
 <svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
 </body>
