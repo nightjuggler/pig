@@ -1336,7 +1336,7 @@ function showFilterCode(event)
 		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
 
 	var html = document.getElementById('svgRoot').innerHTML;
-	var svg = '&lt;<span class="cT">svg</span> <span class="cA">width</span>=&quot;<span class="cV">0</span>&quot; <span class="cA">height</span>=&quot;<span class="cV">0</span>&quot;&gt;';
+	var svg = '&lt;' + markupTag('svg width="0" height="0"')[1] + '&gt;';
 
 	var j = 0;
 	var indent = 0;
@@ -1367,7 +1367,7 @@ function showFilterCode(event)
 		}
 	}
 
-	svg += '\n&lt;/<span class="cT">svg</span>&gt;\n';
+	svg += '\n&lt;/' + markupTag('svg')[1] + '&gt;\n';
 
 	var cssCode = document.getElementById("cssCode");
 	var svgCode = document.getElementById("svgCode");
