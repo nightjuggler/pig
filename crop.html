@@ -54,6 +54,22 @@ input, select {
 	animation-timing-function: linear;
 	animation-play-state: paused;
 }
+#filterCodeDiv {
+	background-color: rgb(230,230,250); /* Lavender */
+	border: 2px solid black;
+	border-radius: 10px;
+	display: none;
+	padding: 10px;
+	position: absolute;
+}
+code {
+	background-color: rgb(230,230,230);
+	border-radius: 10px;
+	display: block;
+	overflow: scroll;
+	padding: 4px;
+	white-space: pre;
+}
 #controlDiv {
 	background-color: rgba(230,230,250,0.8);
 	border: 2px solid black;
@@ -151,8 +167,10 @@ a:hover {
 	display: none;
 }
 input[type="range"] {
+	margin-left: 2px;
+	margin-right: 2px;
 	vertical-align: middle;
-	width: 160px;
+	width: 180px;
 }
 #canvas {
 	border: 4px solid black;
@@ -1288,6 +1306,74 @@ function swapXYFilters()
 			filter.selectElement.selectedIndex = option.swapIndex;
 	}
 }
+function showFilterCode(event)
+{
+	event.preventDefault();
+
+	var filterStyle = photo.style.filter || 'none';
+	var css = '-webkit-filter: ' + filterStyle + ';\nfilter: ' + filterStyle + ';\n';
+
+	var html = document.getElementById('svgRoot').innerHTML;
+	var svg = '&lt;svg width="0" height="0"&gt;';
+
+	var j = 0;
+	var indent = 0;
+	var previousTag = null;
+
+	while ((j = html.indexOf('<', j)) >= 0)
+	{
+		var endTag = html.charAt(j + 1) === '/';
+		var k = endTag ? j + 2 : j + 1;
+
+		j = html.indexOf('>', k);
+		var tagData = html.substr(k, j - k);
+		k = tagData.indexOf(' ');
+		var tag = k < 0 ? tagData : tagData.substr(0, k);
+
+		if (endTag) {
+			--indent;
+			if  (tag !== previousTag) {
+				svg += '\n';
+				for (k = 0; k < indent; ++k) svg += '  ';
+			}
+			svg += '&lt;/' + tagData + '&gt;';
+			previousTag = null;
+		} else {
+			svg += '\n';
+			for (k = 0; k < indent; ++k) svg += '  ';
+			svg += '&lt;' + tagData + '&gt;';
+			previousTag = tag;
+			++indent;
+		}
+	}
+
+	svg += '\n&lt;/svg&gt;\n';
+
+	var cssCode = document.getElementById("cssCode");
+	var svgCode = document.getElementById("svgCode");
+
+	cssCode.style.width = 'auto';
+	cssCode.style.height = 'auto';
+	svgCode.style.width = 'auto';
+	svgCode.style.height = 'auto';
+
+	cssCode.innerHTML = css;
+	svgCode.innerHTML = svg;
+
+	var filterCodeDiv = document.getElementById("filterCodeDiv");
+	filterCodeDiv.style.display = "block";
+
+	cssCode.style.width = cssCode.clientWidth > 880 ? '880px' : '100%';
+	svgCode.style.width = svgCode.clientWidth > 880 ? '880px' : '100%';
+	if (cssCode.clientHeight > 580) cssCode.style.height = '580px';
+	if (svgCode.clientHeight > 580) svgCode.style.height = '580px';
+
+	centerElement(filterCodeDiv, null, null);
+}
+function hideFilterCode()
+{
+	document.getElementById("filterCodeDiv").style.display = "none";
+}
 function applyFilters()
 {
 	var filterList = [];
@@ -1693,6 +1779,7 @@ function bodyLoaded()
 
 	createFilterDiv();
 	document.getElementById("toggleFiltersLink").addEventListener("click", toggleShowFilters, false);
+	document.getElementById("showFilterCode").addEventListener("click", showFilterCode, false);
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	loadImage();
 }
@@ -1729,6 +1816,7 @@ Display Width x Height: <input
 <input type="checkbox" id="inverseAspectRatioCheckbox" onclick="toggleInverseAspectRatio()" />
 Crop Inverse Aspect Ratio
 &nbsp;&nbsp;<a href="#" id="toggleFiltersLink">Hide Filters</a>
+(<a href="#" id="showFilterCode">Code</a>)
 &nbsp;&nbsp;<a href="#" id="fileBrowserLink">Browse Files</a>
 <br>
 <input type="file" id="fileBrowser" accept="image/*" multiple onchange="loadFiles()" />
@@ -1743,6 +1831,11 @@ Crop Inverse Aspect Ratio
 
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
+<div id="filterCodeDiv">
+CSS: <code id="cssCode"></code>
+SVG: <code id="svgCode"></code>
+<input type="button" value="Close" onclick="hideFilterCode()" />
+</div>
 <canvas id="canvas"></canvas>
 <svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
 </body>
