@@ -1351,7 +1351,7 @@ function showFilterCode(event)
 {
 	event.preventDefault();
 
-	var filterStyle = markupFilterStyle(photo.style.filter || 'none');
+	var filterStyle = markupFilterStyle(photo.style.webkitFilter || 'none');
 
 	var css = '<span class="cT">-webkit-filter</span>: ' + filterStyle +
 		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
