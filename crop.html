@@ -1309,6 +1309,25 @@ function swapXYFilters()
 			filter.selectElement.selectedIndex = option.swapIndex;
 	}
 }
+function markupFilterStyle(inData)
+{
+	var outData = '';
+
+	var k, i = 0;
+	while (i < inData.length)
+	{
+		k = inData.indexOf('(', i);
+		if (k < 0) { outData += inData.substr(i); break; }
+		outData += '<span class="cA">' + inData.substr(i, k - i) + '</span>(';
+		i = k + 1;
+		k = inData.indexOf(')', i);
+		if (k < 0) { outData += inData.substr(i); break; }
+		outData += '<span class="cV">' + inData.substr(i, k - i) + '</span>)';
+		i = k + 1;
+	}
+
+	return outData;
+}
 function markupTag(inData)
 {
 	var k = inData.indexOf(' ');
@@ -1316,7 +1335,8 @@ function markupTag(inData)
 	var outData = '<span class="cT">' + tag + '</span>';
 
 	var i = tag.length + 1;
-	while (i < inData.length) {
+	while (i < inData.length)
+	{
 		k = inData.indexOf('=', i);
 		outData += ' <span class="cA">' + inData.substr(i, k - i) + '</span>';
 		i = k + 2;
@@ -1331,7 +1351,8 @@ function showFilterCode(event)
 {
 	event.preventDefault();
 
-	var filterStyle = photo.style.filter || 'none';
+	var filterStyle = markupFilterStyle(photo.style.filter || 'none');
+
 	var css = '<span class="cT">-webkit-filter</span>: ' + filterStyle +
 		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
 
