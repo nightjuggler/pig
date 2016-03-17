@@ -73,6 +73,14 @@ code {
 #cssCode {
 	margin-bottom: 4px;
 }
+#copyCSS, #copySVG {
+	background-color: rgb(245,222,179); /* Wheat */
+	border-radius: 6px;
+	float: right;
+	font-size: 8pt;
+	padding: 1px 4px 1px 4px;
+	text-transform: uppercase;
+}
 .cT { color: rgb(0,100,0); } /* DarkGreen */
 .cA { color: rgb(128,0,128); } /* Purple */
 .cV { color: rgb(0,0,128); } /* Navy */
@@ -224,6 +232,9 @@ input[type="range"] {
 	background-color: rgb(0,191,255); /* DeepSkyBlue */
 	color: rgb(0,0,255); /* Blue */
 }
+#cropGeometryDiv {
+	display: none;
+}
 </style>
 <script src="cropList.js"></script>
 <script src="filter.js"></script>
@@ -271,6 +282,8 @@ var imageNames;
 var imageFiles;
 var filters = [];
 var filterIndex = {};
+var copySupported = true;
+var showCropGeometry;
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
 var downloadLink;                // the HTML <a> element for the Save link
@@ -701,7 +714,7 @@ function changeCropY()
 }
 function setSpecParam()
 {
-	document.getElementById("specParam").value = "('"
+	document.getElementById("cropGeometry").value = "('"
 		+ document.getElementById("fileNameField").value + "', '"
 		+ cropWidth + "x" + cropHeight + "+"
 		+ cropXField.value + "+" + cropYField.value + "')";
@@ -1796,22 +1809,22 @@ function loadFiles()
 
 	loadImage();
 }
+function copyToClipboard()
+{
+	if (!copySupported) return;
+
+	copySupported = document.execCommand("copy");
+
+	if (copySupported) return;
+
+	for (var id of ["copyCSS", "copySVG", "copyCropGeometry"])
+		document.getElementById(id).firstChild.nodeValue = "Select";
+}
 function copyNode(event, elementId)
 {
 	event.preventDefault();
-
-	var range = document.createRange();
-	range.selectNode(document.getElementById(elementId));
-
-	var selection = window.getSelection();
-	if (selection.rangeCount > 0)
-		selection.removeAllRanges();
-	selection.addRange(range);
-
-	try {
-		document.execCommand("copy");
-	} catch (exception) {
-	}
+	window.getSelection().selectAllChildren(document.getElementById(elementId));
+	copyToClipboard();
 }
 function copyCSS(event)
 {
@@ -1820,6 +1833,29 @@ function copyCSS(event)
 function copySVG(event)
 {
 	copyNode(event, "svgCode");
+}
+function copyCropGeometry(event)
+{
+	event.preventDefault();
+	document.getElementById("cropGeometry").select();
+	copyToClipboard();
+}
+function documentKeyDown(event)
+{
+	if (event.target instanceof HTMLInputElement ||
+		event.target instanceof HTMLSelectElement) return true;
+
+	var key = event.key || event.keyIdentifier;
+
+	if (key === 'g' || key === 'U+0047') {
+		showCropGeometry = !showCropGeometry;
+		document.getElementById("cropGeometryDiv").style.display = showCropGeometry ? 'block' : 'none';
+	} else
+		return true;
+
+	event.preventDefault();
+	event.stopPropagation();
+	return false;
 }
 function disableCropElements(disable)
 {
@@ -1855,7 +1891,10 @@ function bodyLoaded()
 
 	// Hack for Mozilla to clear any previously selected files
 	document.getElementById("fileBrowser").value = "";
-	document.getElementById("specParam").value = "";
+	document.getElementById("cropGeometry").value = "";
+
+	if (showCropGeometry)
+		document.getElementById("cropGeometryDiv").style.display = "block";
 
 	downloadLink = document.getElementById("downloadLink");
 	downloadLink.addEventListener("click", saveImage, false);
@@ -1866,6 +1905,8 @@ function bodyLoaded()
 	document.getElementById("copyCSS").addEventListener("click", copyCSS, false);
 	document.getElementById("copySVG").addEventListener("click", copySVG, false);
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
+	document.getElementById("copyCropGeometry").addEventListener("click", copyCropGeometry, false);
+	document.addEventListener("keydown", documentKeyDown, false);
 	loadImage();
 }
 </script>
@@ -1915,7 +1956,8 @@ Crop Inverse Aspect Ratio
 <input type="button" id="nextButton" value="Next" onclick="nextImage()" />
 <a download href="#" id="downloadLink">Save</a>
 <br>
-<input type="text" id="specParam" size="44" value="" readonly />
+<div id="cropGeometryDiv"><input type="text" id="cropGeometry" size="44" value="" readonly />
+<a href="#" id="copyCropGeometry">Copy</a></div>
 <div id="filterDiv"></div>
 </div>
 
