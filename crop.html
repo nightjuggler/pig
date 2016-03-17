@@ -59,7 +59,7 @@ input, select {
 	border: 2px solid black;
 	border-radius: 10px;
 	display: none;
-	padding: 10px;
+	padding: 6px 10px 4px 10px; /* top right bottom left */
 	position: absolute;
 }
 code {
@@ -69,6 +69,9 @@ code {
 	overflow: scroll;
 	padding: 4px;
 	white-space: pre;
+}
+#cssCode {
+	margin-bottom: 4px;
 }
 .cT { color: rgb(0,100,0); } /* DarkGreen */
 .cA { color: rgb(128,0,128); } /* Purple */
@@ -1416,8 +1419,10 @@ function showFilterCode(event)
 	var filterCodeDiv = document.getElementById("filterCodeDiv");
 	filterCodeDiv.style.display = "block";
 
-	cssCode.style.width = cssCode.clientWidth > 880 ? '880px' : '100%';
-	svgCode.style.width = svgCode.clientWidth > 880 ? '880px' : '100%';
+	var width = Math.min(880, Math.max(cssCode.clientWidth, svgCode.clientWidth)) + 'px';
+
+	cssCode.style.width = width;
+	svgCode.style.width = width;
 	if (cssCode.clientHeight > 580) cssCode.style.height = '580px';
 	if (svgCode.clientHeight > 580) svgCode.style.height = '580px';
 
@@ -1791,6 +1796,31 @@ function loadFiles()
 
 	loadImage();
 }
+function copyNode(event, elementId)
+{
+	event.preventDefault();
+
+	var range = document.createRange();
+	range.selectNode(document.getElementById(elementId));
+
+	var selection = window.getSelection();
+	if (selection.rangeCount > 0)
+		selection.removeAllRanges();
+	selection.addRange(range);
+
+	try {
+		document.execCommand("copy");
+	} catch (exception) {
+	}
+}
+function copyCSS(event)
+{
+	copyNode(event, "cssCode");
+}
+function copySVG(event)
+{
+	copyNode(event, "svgCode");
+}
 function disableCropElements(disable)
 {
 	var elementIds = [
@@ -1833,6 +1863,8 @@ function bodyLoaded()
 	createFilterDiv();
 	document.getElementById("toggleFiltersLink").addEventListener("click", toggleShowFilters, false);
 	document.getElementById("showFilterCode").addEventListener("click", showFilterCode, false);
+	document.getElementById("copyCSS").addEventListener("click", copyCSS, false);
+	document.getElementById("copySVG").addEventListener("click", copySVG, false);
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	loadImage();
 }
@@ -1849,8 +1881,8 @@ function bodyLoaded()
 </div>
 
 <div id="filterCodeDiv">
-CSS: <code id="cssCode"></code>
-SVG: <code id="svgCode"></code>
+CSS: <a href="#" id="copyCSS">Copy</a><br><code id="cssCode"></code>
+SVG: <a href="#" id="copySVG">Copy</a><br><code id="svgCode"></code>
 <input type="button" value="Close" onclick="hideFilterCode()" />
 </div>
 <div id="controlDiv">
