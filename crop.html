@@ -945,6 +945,7 @@ function showLoading(fileName)
 	document.getElementById("spinDisc").style.animationPlayState = "running";
 
 	var progressDiv = document.getElementById("progressDiv");
+	progressDiv.style.left = "auto";
 	progressDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
 	progressDiv.style.display = "block";
 	centerElement(progressDiv, 96, null);
@@ -957,10 +958,11 @@ function hideLoading()
 	document.getElementById("progressDiv").style.display = "none";
 	document.getElementById("spinDisc").style.animationPlayState = "paused";
 }
-function showFailed(fileName)
+function showFailed(errorMessage)
 {
 	var failedDiv = document.getElementById("failedDiv");
-	failedDiv.firstChild.nodeValue = "Failed to load " + fileName;
+	failedDiv.style.left = "auto";
+	failedDiv.firstChild.nodeValue = errorMessage;
 	failedDiv.style.display = "block";
 	centerElement(failedDiv, 22, null);
 }
@@ -990,7 +992,7 @@ function imageFailedLoad(event)
 	var fileNameField = document.getElementById("fileNameField");
 	var selectedIndex = fileNameField.selectedIndex;
 
-	showFailed(imageNames[selectedIndex]);
+	showFailed("Failed to load " + imageNames[selectedIndex]);
 
 	if (imageNames.length === 1)
 		imageNames = undefined;
@@ -1212,7 +1214,17 @@ function saveImage(event)
 	else
 		context.drawImage(photo, 0, 0, divWidth, divHeight);
 
-	var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+	var imageData;
+	try {
+		imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+	} catch (exception) {
+		event.preventDefault();
+		if (exception instanceof DOMException && exception.name === 'SecurityError')
+			showFailed(exception);
+		else
+			showFailed(exception);
+		return;
+	}
 
 	for (var filter of filters)
 	{
