@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Cropper</title>
+<title>PIE</title>
 <style>
 body {
 	background-color: rgb(240,255,255); /* Azure */
@@ -189,7 +189,7 @@ input[type="range"] {
 #canvas {
 	border: 4px solid black;
 	display: none;
-	margin-top: 4px;
+	position: absolute;
 }
 #downloadLink {
 	display: none;
@@ -1191,18 +1191,10 @@ function applySepiaFilter(d, amount, channels)
 		[0.349 - 0.349*s, 0.686 + 0.314*s, 0.168 - 0.168*s],
 		[0.272 - 0.272*s, 0.534 - 0.534*s, 0.131 + 0.869*s]);
 }
-function saveImage(event)
+function drawCanvas()
 {
-	if (downloadBlobURL) {
-		if (downloadLinkReady) {
-			downloadLinkReady = false;
-			return;
-		}
-		if (downloadURL !== null)
-			URL.revokeObjectURL(downloadURL);
-	}
-
 	var canvas = document.getElementById("canvas");
+
 	if (rotateAngle === 0 || rotateAngle === 180) {
 		canvas.width = divWidth;
 		canvas.height = divHeight;
@@ -1210,8 +1202,6 @@ function saveImage(event)
 		canvas.width = divHeight;
 		canvas.height = divWidth;
 	}
-//	canvas.style.width = canvas.width + "px";
-//	canvas.style.height = canvas.height + "px";
 
 	var context = canvas.getContext("2d");
 
@@ -1234,12 +1224,11 @@ function saveImage(event)
 	try {
 		imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 	} catch (exception) {
-		event.preventDefault();
 		if (exception instanceof DOMException && exception.name === 'SecurityError')
 			showFailed(exception);
 		else
 			showFailed(exception);
-		return;
+		return null;
 	}
 
 	for (var filter of filters)
@@ -1255,6 +1244,24 @@ function saveImage(event)
 	}
 
 	context.putImageData(imageData, 0, 0);
+	return canvas;
+}
+function saveImage(event)
+{
+	if (downloadBlobURL) {
+		if (downloadLinkReady) {
+			downloadLinkReady = false;
+			return;
+		}
+		if (downloadURL !== null)
+			URL.revokeObjectURL(downloadURL);
+	}
+
+	var canvas = drawCanvas();
+	if (canvas === null) {
+		event.preventDefault();
+		return;
+	}
 
 	if (downloadBlobURL && canvas.toBlob === undefined) // for Chrome and Safari
 		downloadBlobURL = false;
@@ -1269,6 +1276,29 @@ function saveImage(event)
 	} else {
 		downloadLink.href = canvas.toDataURL(downloadType, downloadQuality);
 	}
+}
+function overlayCanvas(event)
+{
+	event.preventDefault();
+
+	var textNode = event.currentTarget.firstChild;
+
+	if (textNode.nodeValue === "Hide Canvas") {
+		document.getElementById("canvas").style.display = "none";
+		controlDiv.style.display = "block";
+		textNode.nodeValue = "Overlay Canvas";
+		return;
+	}
+
+	var canvas = drawCanvas();
+	if (canvas === null)
+		return;
+
+	canvas.style.left = photoDiv.offsetLeft + "px";
+	canvas.style.top = photoDiv.offsetTop + "px";
+	canvas.style.display = "block";
+	controlDiv.style.display = "none";
+	textNode.nodeValue = "Hide Canvas";
 }
 function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter, svgOnly, createSVGFilter)
 {
@@ -1850,6 +1880,8 @@ function documentKeyDown(event)
 	if (key === 'g' || key === 'U+0047') {
 		showCropGeometry = !showCropGeometry;
 		document.getElementById("cropGeometryDiv").style.display = showCropGeometry ? 'block' : 'none';
+	} else if (key === 'o' || key === 'U+004F') {
+		document.getElementById("overlayCanvasLink").click();
 	} else
 		return true;
 
@@ -1906,6 +1938,7 @@ function bodyLoaded()
 	document.getElementById("copySVG").addEventListener("click", copySVG, false);
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	document.getElementById("copyCropGeometry").addEventListener("click", copyCropGeometry, false);
+	document.getElementById("overlayCanvasLink").addEventListener("click", overlayCanvas, false);
 	document.addEventListener("keydown", documentKeyDown, false);
 	loadImage();
 }
@@ -1920,6 +1953,7 @@ function bodyLoaded()
 <div id="resizeSW"></div>
 <div id="resizeSE"></div>
 </div>
+<a href="#" id="overlayCanvasLink">Overlay Canvas</a>
 
 <div id="filterCodeDiv">
 CSS: <a href="#" id="copyCSS">Copy</a><br><code id="cssCode"></code>
@@ -1961,9 +1995,9 @@ Crop Inverse Aspect Ratio
 <div id="filterDiv"></div>
 </div>
 
+<canvas id="canvas"></canvas>
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
-<canvas id="canvas"></canvas>
 <svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
 </body>
 </html>
