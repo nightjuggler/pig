@@ -5,6 +5,7 @@ var channelMap = [['R', 1], ['G', 2], ['B', 4]];
 
 function removeSVGFilter(id)
 {
+	if (id <= 0) return;
 	var filterElement = document.getElementById('filter' + id);
 	filterElement.parentNode.removeChild(filterElement);
 	svgFilterIdBin.push(id);
@@ -36,7 +37,9 @@ function createFilter(channels, fe)
 	var filterNode = document.createElementNS(svgNS, 'filter');
 	filterNode.setAttribute('id', 'filter' + filterId);
 	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
-	filterNode.appendChild(fe);
+
+	for (var i = 1; i < arguments.length; ++i)
+		filterNode.appendChild(arguments[i]);
 
 	if (channels > 0 && channels < 7)
 	{
@@ -157,6 +160,30 @@ function createSVGSepia(amount, channels)
 		[0.349 - 0.349*s, 0.686 + 0.314*s, 0.168 - 0.168*s],
 		[0.272 - 0.272*s, 0.534 - 0.534*s, 0.131 + 0.869*s]));
 }
+function createSVGThreshold(amount, channels)
+{
+	var feFunc;
+
+	var fe1 = document.createElementNS(svgNS, 'feComponentTransfer');
+	var fe2 = document.createElementNS(svgNS, 'feComponentTransfer');
+
+	amount = (-(amount - 1)/255).toFixed(6);
+
+	for (var [letter, flag] of channelMap)
+		if ((channels & flag) === flag)
+		{
+			feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'linear');
+			feFunc.setAttribute('intercept', amount);
+			fe1.appendChild(feFunc);
+			feFunc = document.createElementNS(svgNS, 'feFunc' + letter);
+			feFunc.setAttribute('type', 'linear');
+			feFunc.setAttribute('slope', '255');
+			fe2.appendChild(feFunc);
+		}
+
+	return createFilter(7, fe1, fe2);
+}
 function createGaussianBlur(xRadius, yRadius)
 {
 	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
@@ -174,6 +201,10 @@ function createBlurYFilter(yRadius, channels)
 function createBlurFilter(radius, channels)
 {
 	return createFilter(channels, createGaussianBlur(radius, radius));
+}
+function svgCannotImplement(amount, channels)
+{
+	return -1;
 }
 var BlurFlags = {
 	xDirectional: 0b00000001,
@@ -639,6 +670,23 @@ function polarTransform(context, inData, channels, info)
 		}
 
 	return outData;
+}
+function applyPolarTransform(context, imageData, value, channels)
+{
+	var info = {};
+
+	if (value < 0) {
+		info.reverse = true;
+		value = -value;
+	}
+
+	info.radius = [
+		Polar.RadiusHalfDiagonal,
+		Polar.RadiusHalfWidth,
+		Polar.RadiusHalfHeight,
+		Polar.RadiusHeight][value - 1];
+
+	return polarTransform(context, imageData, channels, info);
 }
 function applyThreshold(d, amount, channels)
 {

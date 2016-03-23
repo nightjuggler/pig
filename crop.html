@@ -1327,8 +1327,12 @@ new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateF
 new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
 new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter),   false, createSVGSaturate),
 new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter),      false, createSVGSepia),
+new FilterOption('threshold',  '',     -1,-1,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
-new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter)
+new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
+new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                         true,  svgCannotImplement),
+new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  svgCannotImplement),
+new FilterOption('polar',      '',      0,-4,    4, applyPolarTransform,                 true,  svgCannotImplement),
 ];
 function Filter(selectElement, sliderElement, inputElement, textNode)
 {
@@ -1485,7 +1489,7 @@ function applyFilters()
 			continue;
 		if (filter.id === 0)
 			filterList.push(option.name + '(' + filter.value + option.unit + ')');
-		else
+		else if (filter.id > 0)
 			filterList.push('url(#filter' + filter.id + ')');
 	}
 	var filterStyle = filterList.length === 0 ? 'none' : filterList.join(' ');
