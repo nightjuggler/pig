@@ -1397,10 +1397,10 @@ var blurUI = {
 		var edgeSelect = document.createElement('SELECT');
 		edgeSelect.add(new Option('duplicate', 'duplicate', true, true));
 		edgeSelect.add(new Option('wrap', 'wrap', false, false));
-		edgeSelect.add(new Option('black', 'black', false, false));
+		edgeSelect.add(new Option('black', 'none', false, false));
 		edgeSelect.add(new Option('mirror', 'mirror', false, false));
 		edgeSelect.addEventListener('change',
-			function(event) {filter.edgeMode = edgeSelect.value;}, false);
+			function(event) {filter.edgeMode = edgeSelect.value; manageFilters(filter);}, false);
 
 		var div = filter.uiDiv;
 		div.appendChild(document.createElement('BR'));
@@ -1710,8 +1710,9 @@ function manageFilters(filter)
 		(option.svgOnly || filter.channels < 7))
 	{
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
+		var info = option.ui.getInfo ? option.ui.getInfo(filter) : undefined;
 
-		filter.id = option.createSVGFilter(amount, filter.channels);
+		filter.id = option.createSVGFilter(amount, filter.channels, info);
 	}
 	applyFilters();
 }

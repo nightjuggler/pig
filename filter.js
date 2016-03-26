@@ -184,23 +184,25 @@ function createSVGThreshold(amount, channels)
 
 	return createFilter(7, fe1, fe2);
 }
-function createGaussianBlur(xRadius, yRadius)
+function createGaussianBlur(xRadius, yRadius, edgeMode)
 {
 	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
 	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
+	if (edgeMode !== 'mirror')
+		fe.setAttribute('edgeMode', edgeMode);
 	return fe;
 }
-function createBlurXFilter(xRadius, channels)
+function createBlurXFilter(xRadius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(xRadius, 0));
+	return createFilter(channels, createGaussianBlur(xRadius, 0, edgeMode));
 }
-function createBlurYFilter(yRadius, channels)
+function createBlurYFilter(yRadius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(0, yRadius));
+	return createFilter(channels, createGaussianBlur(0, yRadius, edgeMode));
 }
-function createBlurFilter(radius, channels)
+function createBlurFilter(radius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(radius, radius));
+	return createFilter(channels, createGaussianBlur(radius, radius, edgeMode));
 }
 function svgCannotImplement(amount, channels)
 {
