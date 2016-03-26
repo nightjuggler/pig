@@ -239,6 +239,7 @@ function boxBlur(blurInfo, radiusType)
 	var zDelta = (width - 1) * delta;
 	vDelta -= zDelta + delta;
 	width -= size;
+	if (width < 0) return;
 
 	var edgeMode = blurInfo.edgeMode;
 	var blurR = blurInfo.blurR;
@@ -526,25 +527,25 @@ function applyBlur(context, imageData, xRadius, yRadius, channels, edgeMode, fla
 
 	return blur(blurInfo);
 }
-function applyBlurFilter(context, imageData, radius, channels)
+function applyBlurFilter(context, imageData, radius, channels, edgeMode)
 {
-	return applyBlur(context, imageData, radius, radius, channels, 'edge', 0);
+	return applyBlur(context, imageData, radius, radius, channels, edgeMode, 0);
 }
-function applyBlurXFilter(context, imageData, radius, channels)
+function applyBlurXFilter(context, imageData, radius, channels, edgeMode)
 {
-	return applyBlur(context, imageData, radius, 0, channels, 'edge', 0);
+	return applyBlur(context, imageData, radius, 0, channels, edgeMode, 0);
 }
-function applyBlurYFilter(context, imageData, radius, channels)
+function applyBlurYFilter(context, imageData, radius, channels, edgeMode)
 {
-	return applyBlur(context, imageData, 0, radius, channels, 'edge', 0);
+	return applyBlur(context, imageData, 0, radius, channels, edgeMode, 0);
 }
-function applyDBlurX(context, imageData, radius, channels)
+function applyDBlurX(context, imageData, radius, channels, edgeMode)
 {
-	return applyBlur(context, imageData, radius, 0, channels, 'edge', BlurFlags.xDirectional);
+	return applyBlur(context, imageData, radius, 0, channels, edgeMode, BlurFlags.xDirectional);
 }
-function applyDBlurY(context, imageData, radius, channels)
+function applyDBlurY(context, imageData, radius, channels, edgeMode)
 {
-	return applyBlur(context, imageData, 0, radius, channels, 'edge', BlurFlags.yDirectional);
+	return applyBlur(context, imageData, 0, radius, channels, edgeMode, BlurFlags.yDirectional);
 }
 var Polar = {
 	RadiusHalfDiagonal: function(w,h) {return Math.sqrt(w*w + h*h)/2;},
@@ -555,12 +556,23 @@ var Polar = {
 	EdgeTransparent:    new Uint8ClampedArray([0, 0, 0, 0]),
 	EdgeDuplicate:      null,
 };
+Polar.Radii = [
+	Polar.RadiusHalfDiagonal,
+	Polar.RadiusHalfWidth,
+	Polar.RadiusHalfHeight,
+	Polar.RadiusHeight,
+];
+Polar.EdgeModes = [
+	Polar.EdgeDuplicate,
+	Polar.EdgeBlack,
+	Polar.EdgeTransparent,
+];
 function setChannelFlags(info, channels)
 {
 	info.setR = false;
 	info.setG = false;
 	info.setB = false;
-	info.setA = false;
+	info.setA = true;
 
 	if (typeof channels === 'number') {
 		if ((channels & 1) === 1) info.setR = true;
@@ -671,21 +683,21 @@ function polarTransform(context, inData, channels, info)
 
 	return outData;
 }
-function applyPolarTransform(context, imageData, value, channels)
+function applyPolarTransform(context, imageData, value, channels, edgeMode)
 {
-	var info = {};
-
-	if (value < 0) {
-		info.reverse = true;
-		value = -value;
-	}
-
-	info.radius = [
-		Polar.RadiusHalfDiagonal,
-		Polar.RadiusHalfWidth,
-		Polar.RadiusHalfHeight,
-		Polar.RadiusHeight][value - 1];
-
+	var info = {
+		radius: Polar.Radii[value],
+		edgePixel: Polar.EdgeModes[edgeMode],
+	};
+	return polarTransform(context, imageData, channels, info);
+}
+function applyReversePolarTransform(context, imageData, value, channels, edgeMode)
+{
+	var info = {
+		reverse: true,
+		radius: Polar.Radii[value],
+		edgePixel: Polar.EdgeModes[edgeMode],
+	};
 	return polarTransform(context, imageData, channels, info);
 }
 function applyThreshold(d, amount, channels)

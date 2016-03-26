@@ -159,12 +159,29 @@ a:hover {
 #filterDiv table {
 	margin-left: auto;
 	margin-right: auto;
-	border-spacing: 0;
+	border-collapse: collapse;
 }
 #filterDiv td {
 	padding-left: 4px;
 	padding-right: 4px;
 	text-align: left;
+}
+.uiDiv {
+	display: inline-block;
+}
+.uiDivBlur {
+	vertical-align: -160%;
+}
+.uiDivPolar {
+	padding-left: 4px;
+	vertical-align: top;
+}
+.ui1 {
+}
+.ui2 {
+	border-color: rgb(128,128,128);
+	border-width: 2px;
+	border-style: dashed;
 }
 .clickable {
 	font-size: 12pt;
@@ -1233,14 +1250,15 @@ function drawCanvas()
 
 	for (var filter of filters)
 	{
-		var option = filterOptions[filter.selectElement.selectedIndex];
+		var option = filter.option;
 
-		if (filter.value === option.defaultValue || filter.channels === 0)
+		if (filter.value === option.noChangeValue || filter.channels === 0)
 			continue;
 
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
+		var info = option.ui.getInfo ? option.ui.getInfo(filter) : undefined;
 
-		imageData = option.applyFilter(context, imageData, amount, filter.channels);
+		imageData = option.applyFilter(context, imageData, amount, filter.channels, info);
 	}
 
 	context.putImageData(imageData, 0, 0);
@@ -1300,11 +1318,184 @@ function overlayCanvas(event)
 	controlDiv.style.display = "none";
 	textNode.nodeValue = "Hide Canvas";
 }
+var standardUI = {
+	create: function(filter)
+	{
+		var option = filter.option;
+		var changeHandler = function(event) { changeFilterValue(filter, event); };
+		var keydownHandler = function(event) { return handleSliderKeyDown(filter, event); };
+
+		var sliderElement = document.createElement('INPUT');
+		sliderElement.type = 'range';
+		sliderElement.min = option.minValue;
+		sliderElement.max = option.maxValue;
+		sliderElement.value = option.defaultValue;
+		sliderElement.addEventListener('change', changeHandler, false);
+		sliderElement.addEventListener('keydown', keydownHandler, false);
+
+		var inputElement = document.createElement('INPUT');
+		inputElement.type = 'text';
+		inputElement.size = 4;
+		inputElement.maxLength = 4;
+		inputElement.value = option.defaultValue;
+		inputElement.addEventListener('change', changeHandler, false);
+
+		var div = filter.uiDiv;
+		div.appendChild(sliderElement);
+		div.appendChild(inputElement);
+		div.appendChild(document.createTextNode(option.unit));
+
+		filter.value = option.defaultValue;
+		filter.sliderElement = sliderElement;
+		filter.inputElement = inputElement;
+	},
+	remove: function(filter)
+	{
+		var div = filter.uiDiv;
+		while (div.firstChild)
+			div.removeChild(div.firstChild);
+
+		delete filter.sliderElement;
+		delete filter.inputElement;
+	},
+	setDefault: function(filter)
+	{
+		var option = filter.option;
+		filter.sliderElement.min = option.minValue;
+		filter.sliderElement.max = option.maxValue;
+
+		filter.value = option.defaultValue;
+		filter.sliderElement.value = filter.value;
+		filter.inputElement.value = filter.value;
+		filter.inputElement.nextSibling.nodeValue = option.unit;
+	}
+};
+var blurUI = {
+	create: function(filter)
+	{
+		standardUI.create(filter);
+		this._createFromStandard(filter);
+	},
+	remove: function(filter)
+	{
+		this._revertToStandard(filter);
+		standardUI.remove(filter);
+	},
+	_createFromStandard: function(filter)
+	{
+		var edgeSelect = document.createElement('SELECT');
+		edgeSelect.add(new Option('duplicate', 'duplicate', true, true));
+		edgeSelect.add(new Option('wrap', 'wrap', false, false));
+		edgeSelect.add(new Option('black', 'black', false, false));
+		edgeSelect.add(new Option('mirror', 'mirror', false, false));
+		edgeSelect.addEventListener('change',
+			function(event) {filter.edgeMode = edgeSelect.value;}, false);
+
+		var div = filter.uiDiv;
+		div.appendChild(document.createElement('BR'));
+		div.appendChild(document.createTextNode('Edge Mode:'));
+		div.appendChild(edgeSelect);
+		div.className = 'uiDiv uiDivBlur';
+		div.parentNode.className = 'ui2';
+
+		filter.edgeMode = edgeSelect.value;
+	},
+	createFromStandard: function(filter)
+	{
+		standardUI.setDefault(filter);
+		this._createFromStandard(filter);
+	},
+	_revertToStandard: function(filter)
+	{
+		var div = filter.uiDiv;
+		div.removeChild(div.lastChild);
+		div.removeChild(div.lastChild);
+		div.removeChild(div.lastChild);
+		div.className = 'uiDiv';
+		div.parentNode.className = 'ui1';
+
+		delete filter.edgeMode;
+	},
+	revertToStandard: function(filter)
+	{
+		this._revertToStandard(filter);
+		standardUI.setDefault(filter);
+	},
+	setDefault: function(filter)
+	{
+		standardUI.setDefault(filter);
+	},
+	getInfo: function(filter)
+	{
+		return filter.edgeMode;
+	}
+};
+var polarUI = {
+	create: function(filter)
+	{
+		var radiusSelect = document.createElement('SELECT');
+		radiusSelect.add(new Option('diagonal/2', '0', true, true));
+		radiusSelect.add(new Option('width/2', '1', false, false));
+		radiusSelect.add(new Option('height/2', '2', false, false));
+		radiusSelect.add(new Option('height', '3', false, false));
+		radiusSelect.addEventListener('change',
+			function(event) {filter.value = radiusSelect.selectedIndex;}, false);
+
+		var edgeSelect = document.createElement('SELECT');
+		edgeSelect.add(new Option('duplicate', '0', true, true));
+		edgeSelect.add(new Option('black', '1', false, false));
+		edgeSelect.add(new Option('transparent', '2', false, false));
+		edgeSelect.addEventListener('change',
+			function(event) {filter.edgeMode = edgeSelect.selectedIndex;}, false);
+
+		var div = filter.uiDiv;
+		div.appendChild(document.createTextNode('Radius:'));
+		div.appendChild(radiusSelect);
+		div.appendChild(document.createElement('BR'));
+		div.appendChild(document.createTextNode('Edge Mode:'));
+		div.appendChild(edgeSelect);
+		div.className = 'uiDiv uiDivPolar';
+		div.parentNode.className = 'ui2';
+
+		filter.value = 0;
+		filter.edgeMode = 0;
+	},
+	remove: function(filter)
+	{
+		var div = filter.uiDiv;
+		while (div.firstChild)
+			div.removeChild(div.firstChild);
+
+		div.className = 'uiDiv';
+		div.parentNode.className = 'ui1';
+
+		delete filter.edgeMode;
+	},
+	createFromStandard: function(filter)
+	{
+		standardUI.remove(filter);
+		this.create(filter);
+	},
+	revertToStandard: function(filter)
+	{
+		this.remove(filter);
+		standardUI.create(filter);
+	},
+	setDefault: function(filter)
+	{
+	},
+	getInfo: function(filter)
+	{
+		return filter.edgeMode;
+	}
+};
 function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter, svgOnly, createSVGFilter)
 {
 	this.name = name;
 	this.unit = unit;
 	this.defaultValue = defaultValue;
+	this.noChangeValue = defaultValue;
+	this.ui = standardUI;
 	this.minValue = minValue;
 	this.maxValue = maxValue;
 	this.applyFilter = applyFilter;
@@ -1327,21 +1518,21 @@ new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateF
 new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
 new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter),   false, createSVGSaturate),
 new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter),      false, createSVGSepia),
-new FilterOption('threshold',  '',     -1,-1,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
+new FilterOption('threshold',  '',    128, 0,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
 new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                         true,  svgCannotImplement),
 new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  svgCannotImplement),
-new FilterOption('polar',      '',      0,-4,    4, applyPolarTransform,                 true,  svgCannotImplement),
+new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  svgCannotImplement),
+new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  svgCannotImplement),
 ];
-function Filter(selectElement, sliderElement, inputElement, textNode)
+function Filter(tableCell)
 {
-	this.selectElement = selectElement;
-	this.sliderElement = sliderElement;
-	this.inputElement = inputElement;
-	this.tableRow = selectElement.parentNode.parentNode;
-	this.textNode = textNode;
-	this.value = parseInt(inputElement.value, 10);
+	this.selectElement = tableCell.firstChild;
+	this.tableRow = tableCell.parentNode;
+	this.uiDiv = tableCell.lastChild;
+	this.option = filterOptions[this.selectElement.selectedIndex];
+	this.option.ui.create(this);
 	this.channels = 7;
 	this.id = 0;
 }
@@ -1365,11 +1556,8 @@ function swapXYFilters()
 		}
 	}
 	for (var filter of filters)
-	{
-		var option = filterOptions[filter.selectElement.selectedIndex];
-		if (option.swapIndex !== null)
-			filter.selectElement.selectedIndex = option.swapIndex;
-	}
+		if (filter.option.swapIndex !== null)
+			filter.selectElement.selectedIndex = filter.option.swapIndex;
 }
 function markupFilterStyle(inData)
 {
@@ -1484,8 +1672,8 @@ function applyFilters()
 	var filterList = [];
 	for (var filter of filters)
 	{
-		var option = filterOptions[filter.selectElement.selectedIndex];
-		if (filter.value === option.defaultValue || filter.channels === 0)
+		var option = filter.option;
+		if (filter.value === option.noChangeValue || filter.channels === 0)
 			continue;
 		if (filter.id === 0)
 			filterList.push(option.name + '(' + filter.value + option.unit + ')');
@@ -1496,14 +1684,15 @@ function applyFilters()
 	photo.style.webkitFilter = filterStyle;
 	photo.style.filter = filterStyle;
 }
-function manageFilters(filter, option)
+function manageFilters(filter)
 {
 	if (filter.id !== 0)
 	{
 		removeSVGFilter(filter.id);
 		filter.id = 0;
 	}
-	if (filter.value !== option.defaultValue && filter.channels > 0 &&
+	var option = filter.option;
+	if (filter.value !== option.noChangeValue && filter.channels > 0 &&
 		(option.svgOnly || filter.channels < 7))
 	{
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
@@ -1520,24 +1709,28 @@ function changeFilterName(event)
 	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
 	var option = filterOptions[selectElement.selectedIndex];
 
-	filter.sliderElement.min = option.minValue;
-	filter.sliderElement.max = option.maxValue;
+	var oldUI = filter.option.ui;
+	var newUI = option.ui;
 
-	filter.value = option.defaultValue;
-	filter.sliderElement.value = option.defaultValue;
-	filter.inputElement.value = option.defaultValue;
-	filter.textNode.nodeValue = option.unit;
+	filter.option = option;
 
-	manageFilters(filter, option);
+	if (oldUI === newUI)
+		newUI.setDefault(filter);
+	else if (oldUI === standardUI)
+		newUI.createFromStandard(filter);
+	else if (newUI === standardUI)
+		oldUI.revertToStandard(filter);
+	else {
+		oldUI.remove(filter);
+		newUI.create(filter);
+	}
+
+	manageFilters(filter);
 }
-function changeFilterValue(event)
+function changeFilterValue(filter, event)
 {
 	var inputElement = event.currentTarget;
-	var tableRow = inputElement.parentNode.parentNode;
-
-	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
-	var option = filterOptions[filter.selectElement.selectedIndex];
-
+	var option = filter.option;
 	var value = parseInt(inputElement.value, 10);
 
 	if (isNaN(value) || value != inputElement.value || value < option.minValue || value > option.maxValue) {
@@ -1548,10 +1741,10 @@ function changeFilterValue(event)
 			filter.inputElement.value = value;
 		else
 			filter.sliderElement.value = value;
-		manageFilters(filter, option);
+		manageFilters(filter);
 	}
 }
-function handleSliderKeyDown(event)
+function handleSliderKeyDown(filter, event)
 {
 	var key = event.key || event.keyIdentifier;
 	if (key === 'Tab' || key === 'U+0009')
@@ -1560,12 +1753,7 @@ function handleSliderKeyDown(event)
 	event.preventDefault();
 	event.stopPropagation();
 
-	var sliderElement = event.currentTarget;
-	var tableRow = sliderElement.parentNode.parentNode;
-
-	var filter = filters[parseInt(tableRow.id.substr(9), 10)];
-	var option = filterOptions[filter.selectElement.selectedIndex];
-
+	var option = filter.option;
 	var value = filter.value;
 	var step = Math.min(10, Math.max(1, Math.floor((option.maxValue - option.minValue) / 20)));
 
@@ -1588,7 +1776,7 @@ function handleSliderKeyDown(event)
 	filter.inputElement.value = value;
 	filter.sliderElement.value = value;
 
-	manageFilters(filter, option);
+	manageFilters(filter);
 	return false;
 }
 function addFilterRowBefore(event)
@@ -1678,8 +1866,6 @@ function selectChannel(event)
 	var channel = span.firstChild.nodeValue;
 
 	var filter = filters[parseInt(tableRow.id.substr(9), 10)]; // e.g. filterRow0
-	var option = filterOptions[filter.selectElement.selectedIndex];
-
 	var flag = channel === 'R' ? 1 : channel === 'G' ? 2 : 4;
 
 	if ((filter.channels & flag) === 0) {
@@ -1690,7 +1876,7 @@ function selectChannel(event)
 		span.className = 'channelOff';
 	}
 
-	manageFilters(filter, option);
+	manageFilters(filter);
 }
 function createChannelSelector(tableCell, channel)
 {
@@ -1741,41 +1927,30 @@ function createFilterRow(rowNumber)
 		addFilterCell(tableRow, createEmptyText());
 
 	var selectElement = document.createElement('SELECT');
+	for (var option of filterOptions)
+	{
+		var name = option.name;
+		if (option.createSVGFilter === svgCannotImplement)
+			name += ' *';
+		selectElement.add(new Option(name, option.name, false, false));
+	}
+
+	selectElement.selectedIndex = filterIndex['contrast'];
 	selectElement.addEventListener('change', changeFilterName, false);
 
-	for (var option of filterOptions)
-		selectElement.add(new Option(option.name, option.name, false, false));
-
-	option = filterOptions[selectElement.selectedIndex = filterIndex['contrast']];
-
-	var sliderElement = document.createElement('INPUT');
-	sliderElement.type = 'range';
-	sliderElement.min = option.minValue;
-	sliderElement.max = option.maxValue;
-	sliderElement.value = option.defaultValue;
-	sliderElement.addEventListener('change', changeFilterValue, false);
-	sliderElement.addEventListener('keydown', handleSliderKeyDown, false);
-
-	var inputElement = document.createElement('INPUT');
-	inputElement.type = 'text';
-	inputElement.size = 4;
-	inputElement.maxLength = 4;
-	inputElement.value = option.defaultValue;
-	inputElement.addEventListener('change', changeFilterValue, false);
-
-	var textNode = document.createTextNode(option.unit);
+	var uiDiv = document.createElement('DIV');
+	uiDiv.className = 'uiDiv';
 
 	var tableCell = document.createElement('TD');
 	tableCell.appendChild(selectElement);
 	createChannelSelector(tableCell, 'R');
 	createChannelSelector(tableCell, 'G');
 	createChannelSelector(tableCell, 'B');
-	tableCell.appendChild(sliderElement);
-	tableCell.appendChild(inputElement);
-	tableCell.appendChild(textNode);
+	tableCell.appendChild(uiDiv);
+	tableCell.className = 'ui1';
 	tableRow.appendChild(tableCell);
 
-	filters[rowNumber] = new Filter(selectElement, sliderElement, inputElement, textNode);
+	filters[rowNumber] = new Filter(tableCell);
 
 	addFilterCell(tableRow, createPlusAfter());
 	if (filters.length === 1)
@@ -1790,13 +1965,42 @@ function createFilterDiv()
 	for (var i = 0; i < filterOptions.length; ++i)
 		filterIndex[filterOptions[i].name] = i;
 
+	var option = filterOptions[filterIndex['threshold']];
+	option.noChangeValue = null;
+
+	option = filterOptions[filterIndex['polar']];
+	option.ui = polarUI;
+	option.noChangeValue = null;
+
+	option = filterOptions[filterIndex['depolar']];
+	option.ui = polarUI;
+	option.noChangeValue = null;
+
+	for (option of ['blur', 'blur-x', 'blur-y', 'd-blur-x', 'd-blur-y'])
+		filterOptions[filterIndex[option]].ui = blurUI;
+
 	var tableRow = createFilterRow(0);
 
 	var table = document.createElement('TABLE');
 	table.appendChild(tableRow);
 
+	var overlayCanvasLink = document.getElementById('overlayCanvasLink');
+	var link = document.createElement('A');
+	link.href = '#';
+	link.appendChild(document.createTextNode('Overlay Canvas'));
+	link.addEventListener('click', function(event)
+		{event.preventDefault(); overlayCanvasLink.click();}, false);
+
+	var note = document.createElement('DIV');
+	note.appendChild(document.createTextNode('Filters marked by an asterisk (*) are not implemented in SVG.'));
+	note.appendChild(document.createElement('BR'));
+	note.appendChild(document.createTextNode('Click '));
+	note.appendChild(link);
+	note.appendChild(document.createTextNode(' to see the effect of these filters.'));
+
 	var filterDiv = document.getElementById('filterDiv');
 	filterDiv.appendChild(table);
+	filterDiv.appendChild(note);
 }
 function toggleShowFilters(event)
 {
