@@ -166,14 +166,24 @@ a:hover {
 	padding-right: 4px;
 	text-align: left;
 }
+#filterDiv select:first-child {
+	vertical-align: middle;
+}
 .uiDiv {
 	display: inline-block;
 }
+.uiDiv select {
+	margin-top: 0px;
+}
 .uiDivBlur {
-	vertical-align: -160%;
+	vertical-align: top;
+}
+.uiDivBlur input[type="text"] {
+	margin-top: 0px;
+	margin-bottom: 0px;
 }
 .uiDivPolar {
-	padding-left: 4px;
+	padding: 3px 0px 0px 4px;  /* top right bottom left */
 	vertical-align: top;
 }
 .ui1 {
@@ -198,8 +208,7 @@ a:hover {
 	display: none;
 }
 input[type="range"] {
-	margin-left: 2px;
-	margin-right: 2px;
+	margin: 0px 2px 0px 2px; /* top right bottom left */
 	vertical-align: middle;
 	width: 180px;
 }
@@ -216,6 +225,7 @@ input[type="range"] {
 	border-width: 1px;
 	cursor: pointer;
 	padding: 2px;
+	vertical-align: middle;
 }
 .channelOff {
 	background-color: rgb(230,230,230);
@@ -224,6 +234,7 @@ input[type="range"] {
 	color: rgb(160,160,160);
 	cursor: pointer;
 	padding: 2px;
+	vertical-align: middle;
 }
 .channelR {
 	background-color: rgb(255,0,0); /* Red */
@@ -1557,7 +1568,10 @@ function swapXYFilters()
 	}
 	for (var filter of filters)
 		if (filter.option.swapIndex !== null)
+		{
 			filter.selectElement.selectedIndex = filter.option.swapIndex;
+			filter.option = filterOptions[filter.option.swapIndex];
+		}
 }
 function markupFilterStyle(inData)
 {
