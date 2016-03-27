@@ -311,6 +311,7 @@ var imageNames;
 var imageFiles;
 var filters = [];
 var filterIndex = {};
+var queryString;
 var copySupported = true;
 var showCropGeometry;
 
@@ -1029,6 +1030,11 @@ function imageLoaded(event)
 
 	init();
 	hideLoading();
+
+	if (queryString.overlayCanvas) {
+		queryString.overlayCanvas = false;
+		document.getElementById("overlayCanvasLink").click();
+	}
 }
 function imageFailedLoad(event)
 {
@@ -1222,6 +1228,8 @@ function applySepiaFilter(d, amount, channels)
 }
 function drawCanvas()
 {
+	if (photo.src === "") return null;
+
 	var canvas = document.getElementById("canvas");
 
 	if (rotateAngle === 0 || rotateAngle === 180) {
@@ -2081,27 +2089,30 @@ function createFilterRow(rowNumber, info)
 
 	return tableRow;
 }
-function getFromQueryString(name)
+function parseQueryString()
 {
+	queryString = {
+		filters: null,
+		overlayCanvas: false,
+	};
+
 	var q = window.location.search;
 
 	if (typeof q === 'string' && q.charAt(0) === '?')
 		for (var s of q.substr(1).split('&'))
 		{
-			var [k, v] = s.split('=', 2);
-			if (k === name)
-				return v;
+			if (s === 'o')
+				queryString.overlayCanvas = true;
+			else if (s.substr(0, 2) === 'f=')
+				queryString.filters = s.substr(2);
 		}
-
-	return null;
 }
 function createFiltersFromQueryString()
 {
-	var f = getFromQueryString('f');
-	if (f === null) return;
+	if (queryString.filters === null) return;
 
 	var filterList = [];
-	for (var s of f.split('/'))
+	for (var s of queryString.filters.split('/'))
 	{
 		var [name, rgb, value, extraValue] = s.split(',', 4);
 
@@ -2323,6 +2334,7 @@ function bodyLoaded()
 	downloadLink = document.getElementById("downloadLink");
 	downloadLink.addEventListener("click", saveImage, false);
 
+	parseQueryString();
 	createFilterDiv();
 	document.getElementById("toggleFiltersLink").addEventListener("click", toggleShowFilters, false);
 	document.getElementById("showFilterCode").addEventListener("click", showFilterCode, false);
