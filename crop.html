@@ -1391,6 +1391,11 @@ var standardUI = {
 		filter.sliderElement.value = filter.value;
 		filter.inputElement.value = filter.value;
 		filter.inputElement.nextSibling.nodeValue = option.unit;
+	},
+	setValueForURL: function(filter, infoList)
+	{
+		if (filter.value !== filter.option.defaultValue)
+			infoList.push(filter.value);
 	}
 };
 var blurUI = {
@@ -1459,6 +1464,14 @@ var blurUI = {
 	{
 		standardUI.setDefault(filter);
 	},
+	setValueForURL: function(filter, infoList)
+	{
+		if (filter.edgeMode !== 'duplicate') {
+			infoList.push(filter.value);
+			infoList.push(filter.edgeMode);
+		} else if (filter.value !== 0)
+			infoList.push(filter.value);
+	},
 	getInfo: function(filter)
 	{
 		return filter.edgeMode;
@@ -1501,7 +1514,7 @@ var polarUI = {
 				filter.value = value;
 			}
 			var edgeMode = parseInt(info.extraValue, 10);
-			if (!isNaN(edgeMode) && edgeMode == info.edgeMode && edgeMode > 0 && edgeMode <= 2) {
+			if (!isNaN(edgeMode) && edgeMode == info.extraValue && edgeMode > 0 && edgeMode <= 2) {
 				edgeSelect.selectedIndex = edgeMode;
 				filter.edgeMode = edgeMode;
 			}
@@ -1530,6 +1543,14 @@ var polarUI = {
 	},
 	setDefault: function(filter)
 	{
+	},
+	setValueForURL: function(filter, infoList)
+	{
+		if (filter.edgeMode !== 0) {
+			infoList.push(filter.value);
+			infoList.push(filter.edgeMode);
+		} else if (filter.value !== 0)
+			infoList.push(filter.value);
 	},
 	getInfo: function(filter)
 	{
@@ -1661,11 +1682,14 @@ function getURL()
 		if ((channels & 2) !== 0) rgb += 'g';
 		if ((channels & 4) !== 0) rgb += 'b';
 
-		var infoList = [option.name, rgb, filter.value];
-		if (option.ui.getInfo)
-			infoList.push(option.ui.getInfo(filter));
+		var infoList = [option.name, rgb];
 
-		filterList.push(infoList.join(','));
+		option.ui.setValueForURL(filter, infoList);
+
+		if (infoList.length === 2 && rgb === 'rgb')
+			filterList.push(option.name);
+		else
+			filterList.push(infoList.join(','));
 	}
 
 	var url = window.location;
@@ -1728,12 +1752,16 @@ function showFilterCode(event)
 	svgCode.style.width = 'auto';
 	svgCode.style.height = 'auto';
 
-	urlCode.innerHTML = getURL() + '\n\n';
+	urlCode.innerHTML = getURL();
 	cssCode.innerHTML = css;
 	svgCode.innerHTML = svg;
 
 	var filterCodeDiv = document.getElementById("filterCodeDiv");
 	filterCodeDiv.style.display = "block";
+
+	if (urlCode.clientWidth > 880)
+		// Add a blank line so the horizontal scroll bar doesn't cover the URL when scrolling.
+		urlCode.innerHTML += '\n\n';
 
 	var width = Math.min(880, Math.max(
 		urlCode.clientWidth,
