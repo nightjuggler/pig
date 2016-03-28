@@ -1642,8 +1642,11 @@ function getURL()
 	var url = window.location;
 
 	url = url.protocol + '//' + url.host + url.pathname;
+	url += '?f=' + filterList.join('/');
+	if (imageFiles === undefined)
+		url += '&i=' + document.getElementById('fileNameField').value;
 
-	return url + '?f=' + filterList.join('/');
+	return url;
 }
 function showFilterCode(event)
 {
