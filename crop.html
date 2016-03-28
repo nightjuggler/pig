@@ -1068,7 +1068,7 @@ function loadImage()
 	if (fileNameField.options.length === 0)
 	{
 		for (var i = 0; i < imageNames.length; ++i)
-			fileNameField.options[i] = new Option(imageNames[i], imageNames[i], false, false);
+			fileNameField.options[i] = new Option(imageNames[i], imageNames[i]);
 		fileNameField.selectedIndex = 0;
 	}
 	var selectedIndex = fileNameField.selectedIndex;
@@ -1297,11 +1297,13 @@ var blurUI = {
 	{
 		var edgeSelect = document.createElement('SELECT');
 		edgeSelect.add(new Option('duplicate', 'duplicate', true, true));
-		edgeSelect.add(new Option('wrap', 'wrap', false, false));
-		edgeSelect.add(new Option('black', 'none', false, false));
-		edgeSelect.add(new Option('mirror', 'mirror', false, false));
-		edgeSelect.addEventListener('change',
-			function(event) {filter.edgeMode = edgeSelect.value; manageFilters(filter);}, false);
+		edgeSelect.add(new Option('wrap', 'wrap'));
+		edgeSelect.add(new Option('black', 'none'));
+		edgeSelect.add(new Option('mirror', 'mirror'));
+		edgeSelect.addEventListener('change', function(event) {
+			filter.edgeMode = edgeSelect.options[edgeSelect.selectedIndex];
+			manageFilters(filter);
+		}, false);
 
 		var div = filter.uiDiv;
 		div.appendChild(document.createElement('BR'));
@@ -1310,18 +1312,15 @@ var blurUI = {
 		div.className = 'uiDiv uiDivBlur';
 		div.parentNode.className = 'ui2';
 
-		filter.edgeMode = edgeSelect.value;
+		filter.edgeMode = edgeSelect.options[0];
 
 		if (info === undefined) return;
 
-		var edgeMode = info.extraValue;
-		if (edgeMode === undefined || edgeMode === filter.edgeMode) return;
-		for (var edgeOption of edgeSelect.options)
-			if (edgeMode === edgeOption.text) {
-				edgeSelect.selectedIndex = edgeOption.index;
-				filter.edgeMode = edgeOption.value;
-				break;
-			}
+		var edgeMode = parseInt(info.extraValue, 10);
+		if (!isNaN(edgeMode) && edgeMode == info.extraValue && edgeMode > 0 && edgeMode <= 3) {
+			edgeSelect.selectedIndex = edgeMode;
+			filter.edgeMode = edgeSelect.options[edgeMode];
+		}
 	},
 	createFromStandard: function(filter)
 	{
@@ -1350,15 +1349,15 @@ var blurUI = {
 	},
 	setValueForURL: function(filter, infoList)
 	{
-		if (filter.edgeMode !== 'duplicate') {
+		if (!filter.edgeMode.defaultSelected) {
 			infoList.push(filter.value);
-			infoList.push(filter.edgeMode);
+			infoList.push(filter.edgeMode.index);
 		} else if (filter.value !== 0)
 			infoList.push(filter.value);
 	},
 	getInfo: function(filter)
 	{
-		return filter.edgeMode;
+		return filter.edgeMode.value;
 	}
 };
 var polarUI = {
@@ -1366,16 +1365,16 @@ var polarUI = {
 	{
 		var radiusSelect = document.createElement('SELECT');
 		radiusSelect.add(new Option('diagonal/2', '0', true, true));
-		radiusSelect.add(new Option('width/2', '1', false, false));
-		radiusSelect.add(new Option('height/2', '2', false, false));
-		radiusSelect.add(new Option('height', '3', false, false));
+		radiusSelect.add(new Option('width/2', '1'));
+		radiusSelect.add(new Option('height/2', '2'));
+		radiusSelect.add(new Option('height', '3'));
 		radiusSelect.addEventListener('change',
 			function(event) {filter.value = radiusSelect.selectedIndex;}, false);
 
 		var edgeSelect = document.createElement('SELECT');
 		edgeSelect.add(new Option('duplicate', '0', true, true));
-		edgeSelect.add(new Option('black', '1', false, false));
-		edgeSelect.add(new Option('transparent', '2', false, false));
+		edgeSelect.add(new Option('black', '1'));
+		edgeSelect.add(new Option('transparent', '2'));
 		edgeSelect.addEventListener('change',
 			function(event) {filter.edgeMode = edgeSelect.selectedIndex;}, false);
 
@@ -1937,7 +1936,7 @@ function createFilterRow(rowNumber, info)
 		var name = option.name;
 		if (option.createSVGFilter === svgCannotImplement)
 			name += ' *';
-		selectElement.add(new Option(name, option.name, false, false));
+		selectElement.add(new Option(name, option.name));
 	}
 
 	selectElement.selectedIndex = filterIndex[info.name];
@@ -2122,7 +2121,7 @@ function copyToClipboard()
 
 	if (copySupported) return;
 
-	for (var id of ["copyCSS", "copySVG", "copyCropGeometry"])
+	for (var id of ["copyURL", "copyCSS", "copySVG", "copyCropGeometry"])
 		document.getElementById(id).firstChild.nodeValue = "Select";
 }
 function copyNode(event, elementId)

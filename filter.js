@@ -188,7 +188,7 @@ function createGaussianBlur(xRadius, yRadius, edgeMode)
 {
 	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
 	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
-	if (edgeMode !== 'mirror')
+	if (edgeMode === 'duplicate' || edgeMode === 'wrap' || edgeMode === 'none')
 		fe.setAttribute('edgeMode', edgeMode);
 	return fe;
 }
