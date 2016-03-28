@@ -196,18 +196,25 @@ function createConvolveElement(kernel, order, inName, outName)
 	fe.setAttribute('kernelMatrix', kernel);
 	return fe;
 }
-function createSVGSobelX(channels)
+var ConvolveKernel = {
+	Sharpen: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+	SobelX: [-1, 0, 1, -2, 0, 2, -1, 0, 1],
+	SobelY: [-1, -2, -1, 0, 0, 0, 1, 2, 1],
+	PrewittX: [-1, 0, 1, -1, 0, 1, -1, 0, 1],
+	PrewittY: [-1, -1, -1, 0, 0, 0, 1, 1, 1],
+	EdgeDetect1: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+	EdgeDetect2: [0, 1, 0, 1, -4, 1, 0, 1, 0],
+	Emboss1: [1, 0, 0, 0, 0, 0, 0, 0, -1],
+	Emboss2: [-2, -1, 0, -1, 1, 1, 0, 1, 2],
+};
+(function() {
+	for (var name in ConvolveKernel)
+		ConvolveKernel['str' + name] = ConvolveKernel[name].join(' ');
+})();
+function addConvolveFilters(channels, kernelX, kernelY)
 {
-	return createFilter(channels, createConvolveElement('-1 0 1 -2 0 2 -1 0 1', '3 3'));
-}
-function createSVGSobelY(channels)
-{
-	return createFilter(channels, createConvolveElement('-1 -2 -1 0 0 0 1 2 1', '3 3'));
-}
-function createSVGSobelXY(channels)
-{
-	var gX = createConvolveElement('-1 0 1 -2 0 2 -1 0 1', '3 3', 'SourceGraphic', 'Gx');
-	var gY = createConvolveElement('-1 -2 -1 0 0 0 1 2 1', '3 3', 'SourceGraphic', 'Gy');
+	var gX = createConvolveElement(kernelX, '3 3', 'SourceGraphic', 'Gx');
+	var gY = createConvolveElement(kernelY, '3 3', 'SourceGraphic', 'Gy');
 	var fe = document.createElementNS(svgNS, 'feComposite');
 	fe.setAttribute('in', 'Gx');
 	fe.setAttribute('in2', 'Gy');
@@ -216,19 +223,35 @@ function createSVGSobelXY(channels)
 	fe.setAttribute('k3', '1');
 	return createFilter(channels, gX, gY, fe);
 }
-function createSVGSharpen(channels)
+function createSVGSobelXY(channels)
 {
-	return createFilter(channels, createConvolveElement('0 -1 0 -1 5 -1 0 -1 0', '3 3'));
+	return addConvolveFilters(channels, ConvolveKernel.strSobelX, ConvolveKernel.strSobelY);
+}
+function createSVGPrewittXY(channels)
+{
+	return addConvolveFilters(channels, ConvolveKernel.strPrewittX, ConvolveKernel.strPrewittY);
 }
 var svgConvolutions = [
+	ConvolveKernel.strSharpen,
 	createSVGSobelXY,
-	createSVGSobelX,
-	createSVGSobelY,
-	createSVGSharpen,
+	ConvolveKernel.strSobelX,
+	ConvolveKernel.strSobelY,
+	createSVGPrewittXY,
+	ConvolveKernel.strPrewittX,
+	ConvolveKernel.strPrewittY,
+	ConvolveKernel.strEdgeDetect1,
+	ConvolveKernel.strEdgeDetect2,
+	ConvolveKernel.strEmboss1,
+	ConvolveKernel.strEmboss2,
 ];
 function createSVGConvolve(value, channels)
 {
-	return svgConvolutions[value](channels);
+	var convolution = svgConvolutions[value - 1];
+
+	if (typeof convolution === 'function')
+		return convolution(channels);
+
+	return createFilter(channels, createConvolveElement(convolution, '3 3'));
 }
 function createGaussianBlur(xRadius, yRadius, edgeMode)
 {
@@ -955,31 +978,37 @@ function addImages(image1, image2, channels)
 
 	return image2;
 }
-function applySobelX(context, imageData, channels)
-{
-	return convolve3x3(context, imageData, channels, [-1, 0, 1, -2, 0, 2, -1, 0, 1]);
-}
-function applySobelY(context, imageData, channels)
-{
-	return convolve3x3(context, imageData, channels, [-1, -2, -1, 0, 0, 0, 1, 2, 1]);
-}
 function applySobelXY(context, imageData, channels)
 {
-	var gX = applySobelX(context, imageData, channels);
-	var gY = applySobelY(context, imageData, channels);
+	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.SobelX);
+	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.SobelY);
 	return addImages(gX, gY, channels);
 }
-function applySharpen(context, imageData, channels)
+function applyPrewittXY(context, imageData, channels)
 {
-	return convolve3x3(context, imageData, channels, [0, -1, 0, -1, 5, -1, 0, -1, 0]);
+	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittX);
+	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittY);
+	return addImages(gX, gY, channels);
 }
 var convolutions = [
+	ConvolveKernel.Sharpen,
 	applySobelXY,
-	applySobelX,
-	applySobelY,
-	applySharpen,
+	ConvolveKernel.SobelX,
+	ConvolveKernel.SobelY,
+	applyPrewittXY,
+	ConvolveKernel.PrewittX,
+	ConvolveKernel.PrewittY,
+	ConvolveKernel.EdgeDetect1,
+	ConvolveKernel.EdgeDetect2,
+	ConvolveKernel.Emboss1,
+	ConvolveKernel.Emboss2,
 ];
 function applyConvolution(context, imageData, value, channels)
 {
-	return convolutions[value](context, imageData, channels);
+	var convolution = convolutions[value - 1];
+
+	if (typeof convolution === 'function')
+		return convolution(context, imageData, channels);
+
+	return convolve3x3(context, imageData, channels, convolution);
 }

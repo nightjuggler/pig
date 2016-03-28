@@ -1453,10 +1453,18 @@ var convolveUI = {
 	create: function(filter, info)
 	{
 		var opSelect = document.createElement('SELECT');
-		opSelect.add(new Option('sobel x+y', '0', true, true));
-		opSelect.add(new Option('sobel x', '1'));
-		opSelect.add(new Option('sobel y', '2'));
-		opSelect.add(new Option('sharpen', '3'));
+		opSelect.add(new Option('none', '0', true, true));
+		opSelect.add(new Option('sharpen', '1'));
+		opSelect.add(new Option('sobel x+y', '2'));
+		opSelect.add(new Option('sobel x', '3'));
+		opSelect.add(new Option('sobel y', '4'));
+		opSelect.add(new Option('prewitt x+y', '5'));
+		opSelect.add(new Option('prewitt x', '6'));
+		opSelect.add(new Option('prewitt y', '7'));
+		opSelect.add(new Option('edge detect 1', '8'));
+		opSelect.add(new Option('edge detect 2', '9'));
+		opSelect.add(new Option('emboss 1', '10'));
+		opSelect.add(new Option('emboss 2', '11'));
 		opSelect.addEventListener('change', function(event) {
 			filter.value = opSelect.selectedIndex;
 			manageFilters(filter);
@@ -1465,13 +1473,14 @@ var convolveUI = {
 		var div = filter.uiDiv;
 		div.appendChild(opSelect);
 		div.className = 'uiDiv uiDivConvolve';
+		div.parentNode.className = 'ui2';
 
 		filter.value = 0;
 
 		if (info === undefined) return;
 
 		var value = parseInt(info.value, 10);
-		if (!isNaN(value) && value == info.value && value > 0 && value <= 3) {
+		if (!isNaN(value) && value == info.value && value > 0 && value <= 11) {
 			opSelect.selectedIndex = value;
 			filter.value = value;
 		}
@@ -1479,10 +1488,10 @@ var convolveUI = {
 	remove: function(filter)
 	{
 		var div = filter.uiDiv;
-		while (div.firstChild)
-			div.removeChild(div.firstChild);
+		div.removeChild(div.firstChild);
 
 		div.className = 'uiDiv';
+		div.parentNode.className = 'ui1';
 	},
 	createFromStandard: function(filter)
 	{
@@ -1524,22 +1533,22 @@ function simpleFilter(applyFilter)
 	}
 }
 var filterOptions = [
-new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     false, createBlurFilter),
 new FilterOption('brightness', '%',   100, 0, 2000, simpleFilter(applyBrightnessFilter), false, createSVGBrightness),
 new FilterOption('contrast',   '%',   100, 0,  800, simpleFilter(applyContrastFilter),   false, createSVGContrast),
-new FilterOption('grayscale',  '%',     0, 0,  100, simpleFilter(applyGrayscaleFilter),  false, createSVGGrayscale),
-new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter),  false, createSVGHueRotate),
-new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
 new FilterOption('saturate',   '%',   100, 0, 1000, simpleFilter(applySaturateFilter),   false, createSVGSaturate),
+new FilterOption('grayscale',  '%',     0, 0,  100, simpleFilter(applyGrayscaleFilter),  false, createSVGGrayscale),
 new FilterOption('sepia',      '%',     0, 0,  100, simpleFilter(applySepiaFilter),      false, createSVGSepia),
+new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateFilter),  false, createSVGHueRotate),
 new FilterOption('threshold',  '',    128, 0,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
+new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
+new FilterOption('convolve',   '',      0, 0,   11, applyConvolution,                    true,  createSVGConvolve),
+new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     false, createBlurFilter),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
 new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                         true,  svgCannotImplement),
 new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  svgCannotImplement),
 new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  svgCannotImplement),
 new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  svgCannotImplement),
-new FilterOption('convolve',   '',      0, 0,    2, applyConvolution,                    true,  createSVGConvolve),
 ];
 function Filter(tableCell, info)
 {
@@ -2132,7 +2141,6 @@ function createFilterDiv()
 
 	option = filterOptions[filterIndex['convolve']];
 	option.ui = convolveUI;
-	option.noChangeValue = null;
 
 	for (option of ['blur', 'blur-x', 'blur-y', 'd-blur-x', 'd-blur-y'])
 		filterOptions[filterIndex[option]].ui = blurUI;
