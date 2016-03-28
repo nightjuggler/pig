@@ -307,6 +307,7 @@ var cropperWidth;
 var cropperHeight;
 var controlDiv;
 
+var imagePath;
 var imageNames;
 var imageFiles;
 var filters = [];
@@ -1045,10 +1046,10 @@ function imageFailedLoad(event)
 
 	showFailed("Failed to load " + imageNames[selectedIndex]);
 
-	if (imageNames.length === 1)
-		imageNames = undefined;
-	else
+	if (imageNames.length > 1)
 		imageNames.splice(selectedIndex, 1);
+	else
+		imageNames = undefined;
 
 	fileNameField.remove(selectedIndex);
 	loadImage();
@@ -1069,7 +1070,11 @@ function loadImage()
 	{
 		for (var i = 0; i < imageNames.length; ++i)
 			fileNameField.options[i] = new Option(imageNames[i], imageNames[i]);
-		fileNameField.selectedIndex = 0;
+		if (queryString.selectedImage > 0) {
+			fileNameField.selectedIndex = queryString.selectedImage;
+			queryString.selectedImage = 0;
+		} else
+			fileNameField.selectedIndex = 0;
 	}
 	var selectedIndex = fileNameField.selectedIndex;
 	prevButton.disabled = (selectedIndex === 0);
@@ -1084,7 +1089,7 @@ function loadImage()
 	imageObject.addEventListener("load", imageLoaded, false);
 	imageObject.addEventListener("error", imageFailedLoad, false);
 	if (imageFiles === undefined)
-		imageObject.src = "originals/" + imageNames[selectedIndex];
+		imageObject.src = imagePath + imageNames[selectedIndex];
 	else
 		imageObject.src = URL.createObjectURL(imageFiles[selectedIndex]);
 }
@@ -1969,18 +1974,41 @@ function parseQueryString()
 	queryString = {
 		filters: null,
 		overlayCanvas: false,
+		selectedImage: 0,
 	};
 
 	var q = window.location.search;
 
-	if (typeof q === 'string' && q.charAt(0) === '?')
-		for (var s of q.substr(1).split('&'))
-		{
-			if (s === 'o')
-				queryString.overlayCanvas = true;
-			else if (s.substr(0, 2) === 'f=')
-				queryString.filters = s.substr(2);
+	if (typeof q !== 'string' || q.charAt(0) !== '?') return;
+
+	for (var s of q.substr(1).split('&'))
+	{
+		if (s === 'o') {
+			queryString.overlayCanvas = true;
+			continue;
 		}
+
+		var i = s.indexOf('=');
+		if (i < 1 || i === s.length - 1) continue;
+		var k = s.substr(0, i);
+		var v = s.substr(i + 1);
+
+		if (k === 'f') {
+			queryString.filters = v;
+			continue;
+		}
+		if (k === 'i') {
+			if (imageNames !== undefined) {
+				i = imageNames.indexOf(v);
+				if (i >= 0) {
+					queryString.selectedImage = i;
+					continue;
+				}
+			}
+			imagePath = '';
+			imageNames = [v];
+		}
+	}
 }
 function createFiltersFromQueryString()
 {
@@ -2188,6 +2216,11 @@ function disableCropElements(disable)
 }
 function bodyLoaded()
 {
+	if (typeof imagePath !== "string")
+		imagePath = "";
+	if (!Array.isArray(imageNames) || imageNames.length === 0)
+		imageNames = undefined;
+
 	disableCropElements(true);
 	photo = document.getElementById("photo");
 	cropper = document.getElementById("cropper");
