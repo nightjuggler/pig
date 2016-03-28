@@ -184,6 +184,52 @@ function createSVGThreshold(amount, channels)
 
 	return createFilter(7, fe1, fe2);
 }
+function createConvolveElement(kernel, order, inName, outName)
+{
+	var fe = document.createElementNS(svgNS, 'feConvolveMatrix');
+	if (typeof inName === 'string')
+		fe.setAttribute('in', inName);
+	if (typeof outName === 'string')
+		fe.setAttribute('result', outName);
+	fe.setAttribute('preserveAlpha', 'true');
+	fe.setAttribute('order', order);
+	fe.setAttribute('kernelMatrix', kernel);
+	return fe;
+}
+function createSVGSobelX(channels)
+{
+	return createFilter(channels, createConvolveElement('-1 0 1 -2 0 2 -1 0 1', '3 3'));
+}
+function createSVGSobelY(channels)
+{
+	return createFilter(channels, createConvolveElement('-1 -2 -1 0 0 0 1 2 1', '3 3'));
+}
+function createSVGSobelXY(channels)
+{
+	var gX = createConvolveElement('-1 0 1 -2 0 2 -1 0 1', '3 3', 'SourceGraphic', 'Gx');
+	var gY = createConvolveElement('-1 -2 -1 0 0 0 1 2 1', '3 3', 'SourceGraphic', 'Gy');
+	var fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in', 'Gx');
+	fe.setAttribute('in2', 'Gy');
+	fe.setAttribute('operator', 'arithmetic');
+	fe.setAttribute('k2', '1');
+	fe.setAttribute('k3', '1');
+	return createFilter(channels, gX, gY, fe);
+}
+function createSVGSharpen(channels)
+{
+	return createFilter(channels, createConvolveElement('0 -1 0 -1 5 -1 0 -1 0', '3 3'));
+}
+var svgConvolutions = [
+	createSVGSobelXY,
+	createSVGSobelX,
+	createSVGSobelY,
+	createSVGSharpen,
+];
+function createSVGConvolve(value, channels)
+{
+	return svgConvolutions[value](channels);
+}
 function createGaussianBlur(xRadius, yRadius, edgeMode)
 {
 	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
@@ -823,4 +869,117 @@ function applyThreshold(d, amount, channels)
 		if (setG) d[i + 1] = (d[i + 1] < amount ? 0 : 255);
 		if (setB) d[i + 2] = (d[i + 2] < amount ? 0 : 255);
 	}
+}
+function convolve3x3(context, inData, channels, kernel)
+{
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
+	var outData = context.createImageData(inData);
+	var s = inData.data;
+	var d = outData.data;
+
+	var width = inData.width;
+	var height = inData.height;
+
+	sumOfWeights = 0;
+	for (var weight of kernel)
+		sumOfWeights += weight;
+	if (sumOfWeights === 0)
+		sumOfWeights = 1;
+
+	// edgeMode is 'duplicate'
+
+	var yDelta = width * 4;
+
+	var k0 = kernel[0], k1 = kernel[1], k2 = kernel[2];
+	var k3 = kernel[3], k4 = kernel[4], k5 = kernel[5];
+	var k6 = kernel[6], k7 = kernel[7], k8 = kernel[8];
+
+	var i = 0;
+	for (var y = 0; y < height; ++y)
+	{
+		var yUp = y === 0 ? 0 : -yDelta;
+		var yDn = y === height - 1 ? 0 : yDelta;
+
+		for (var x = 0; x < width; ++x)
+		{
+			var xLft = x === 0 ? 0 : -4;
+			var xRgt = x === width - 1 ? 0 : 4;
+
+			var i8 = i + yUp + xLft;
+			var i7 = i + yUp;
+			var i6 = i + yUp + xRgt;
+			var i5 = i + xLft;
+			var i3 = i + xRgt;
+			var i2 = i + yDn + xLft;
+			var i1 = i + yDn;
+			var i0 = i + yDn + xRgt;
+
+			d[i] = setR ?
+				k8*s[i8] + k7*s[i7] + k6*s[i6] +
+				k5*s[i5] + k4*s[i ] + k3*s[i3] +
+				k2*s[i2] + k1*s[i1] + k0*s[i0] : s[i];
+			d[i+1] = setG ?
+				k8*s[i8+1] + k7*s[i7+1] + k6*s[i6+1] +
+				k5*s[i5+1] + k4*s[i +1] + k3*s[i3+1] +
+				k2*s[i2+1] + k1*s[i1+1] + k0*s[i0+1] : s[i+1];
+			d[i+2] = setB ?
+				k8*s[i8+2] + k7*s[i7+2] + k6*s[i6+2] +
+				k5*s[i5+2] + k4*s[i +2] + k3*s[i3+2] +
+				k2*s[i2+2] + k1*s[i1+2] + k0*s[i0+2] : s[i+2];
+			d[i+3] = s[i+3];
+			i += 4;
+		}
+	}
+
+	return outData;
+}
+function addImages(image1, image2, channels)
+{
+	var setR = ((channels & 1) === 1);
+	var setG = ((channels & 2) === 2);
+	var setB = ((channels & 4) === 4);
+
+	var d1 = image1.data;
+	var d2 = image2.data;
+	var dLen = d1.length;
+
+	for (var i = 0; i < dLen; i += 4)
+	{
+		if (setR) d2[i]     += d1[i];
+		if (setG) d2[i + 1] += d1[i + 1];
+		if (setB) d2[i + 2] += d1[i + 2];
+	}
+
+	return image2;
+}
+function applySobelX(context, imageData, channels)
+{
+	return convolve3x3(context, imageData, channels, [-1, 0, 1, -2, 0, 2, -1, 0, 1]);
+}
+function applySobelY(context, imageData, channels)
+{
+	return convolve3x3(context, imageData, channels, [-1, -2, -1, 0, 0, 0, 1, 2, 1]);
+}
+function applySobelXY(context, imageData, channels)
+{
+	var gX = applySobelX(context, imageData, channels);
+	var gY = applySobelY(context, imageData, channels);
+	return addImages(gX, gY, channels);
+}
+function applySharpen(context, imageData, channels)
+{
+	return convolve3x3(context, imageData, channels, [0, -1, 0, -1, 5, -1, 0, -1, 0]);
+}
+var convolutions = [
+	applySobelXY,
+	applySobelX,
+	applySobelY,
+	applySharpen,
+];
+function applyConvolution(context, imageData, value, channels)
+{
+	return convolutions[value](context, imageData, channels);
 }

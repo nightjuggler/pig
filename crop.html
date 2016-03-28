@@ -186,6 +186,10 @@ a:hover {
 	padding: 3px 0px 0px 4px; /* top right bottom left */
 	vertical-align: top;
 }
+.uiDivConvolve select {
+	margin-top: 2px;
+	margin-left: 2px;
+}
 .ui1 {
 }
 .ui2 {
@@ -1445,6 +1449,60 @@ var polarUI = {
 		return filter.edgeMode;
 	}
 };
+var convolveUI = {
+	create: function(filter, info)
+	{
+		var opSelect = document.createElement('SELECT');
+		opSelect.add(new Option('sobel x+y', '0', true, true));
+		opSelect.add(new Option('sobel x', '1'));
+		opSelect.add(new Option('sobel y', '2'));
+		opSelect.add(new Option('sharpen', '3'));
+		opSelect.addEventListener('change', function(event) {
+			filter.value = opSelect.selectedIndex;
+			manageFilters(filter);
+		}, false);
+
+		var div = filter.uiDiv;
+		div.appendChild(opSelect);
+		div.className = 'uiDiv uiDivConvolve';
+
+		filter.value = 0;
+
+		if (info === undefined) return;
+
+		var value = parseInt(info.value, 10);
+		if (!isNaN(value) && value == info.value && value > 0 && value <= 3) {
+			opSelect.selectedIndex = value;
+			filter.value = value;
+		}
+	},
+	remove: function(filter)
+	{
+		var div = filter.uiDiv;
+		while (div.firstChild)
+			div.removeChild(div.firstChild);
+
+		div.className = 'uiDiv';
+	},
+	createFromStandard: function(filter)
+	{
+		standardUI.remove(filter);
+		this.create(filter);
+	},
+	revertToStandard: function(filter)
+	{
+		this.remove(filter);
+		standardUI.create(filter);
+	},
+	setDefault: function(filter)
+	{
+	},
+	setValueForURL: function(filter, infoList)
+	{
+		if (filter.value !== 0)
+			infoList.push(filter.value);
+	}
+};
 function FilterOption(name, unit, defaultValue, minValue, maxValue, applyFilter, svgOnly, createSVGFilter)
 {
 	this.name = name;
@@ -1481,6 +1539,7 @@ new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                
 new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  svgCannotImplement),
 new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  svgCannotImplement),
 new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  svgCannotImplement),
+new FilterOption('convolve',   '',      0, 0,    2, applyConvolution,                    true,  createSVGConvolve),
 ];
 function Filter(tableCell, info)
 {
@@ -2066,6 +2125,10 @@ function createFilterDiv()
 
 	option = filterOptions[filterIndex['depolar']];
 	option.ui = polarUI;
+	option.noChangeValue = null;
+
+	option = filterOptions[filterIndex['convolve']];
+	option.ui = convolveUI;
 	option.noChangeValue = null;
 
 	for (option of ['blur', 'blur-x', 'blur-y', 'd-blur-x', 'd-blur-y'])
