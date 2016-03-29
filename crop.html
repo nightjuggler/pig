@@ -1024,11 +1024,11 @@ function preventDefault(event)
 }
 function centerElement(element, top, left)
 {
-	if (top === null) {
+	if (top === undefined) {
 		var displayHeight = document.documentElement.clientHeight;
 		top = Math.round((displayHeight - element.clientHeight) / 2);
 	}
-	if (left === null) {
+	if (left === undefined) {
 		var displayWidth = document.documentElement.clientWidth;
 		left = Math.round((displayWidth - element.clientWidth) / 2);
 	}
@@ -1046,7 +1046,7 @@ function showLoading(fileName)
 	progressDiv.style.left = "auto";
 	progressDiv.firstChild.firstChild.nodeValue = "Loading " + fileName;
 	progressDiv.style.display = "block";
-	centerElement(progressDiv, 96, null);
+	centerElement(progressDiv, 96);
 }
 function hideLoading()
 {
@@ -1062,7 +1062,7 @@ function showFailed(errorMessage)
 	failedDiv.style.left = "auto";
 	failedDiv.firstChild.nodeValue = errorMessage;
 	failedDiv.style.display = "block";
-	centerElement(failedDiv, 22, null);
+	centerElement(failedDiv, 22);
 }
 function hideFailed()
 {
@@ -1119,8 +1119,8 @@ function loadImage()
 	var fileNameField = document.getElementById("fileNameField");
 	if (fileNameField.options.length === 0)
 	{
-		for (var i = 0; i < imageNames.length; ++i)
-			fileNameField.options[i] = new Option(imageNames[i], imageNames[i]);
+		for (var name of imageNames)
+			fileNameField.add(new Option(name, name));
 		if (queryString.selectedImage > 0) {
 			fileNameField.selectedIndex = queryString.selectedImage;
 			queryString.selectedImage = 0;
@@ -1497,26 +1497,12 @@ var polarUI = {
 	}
 };
 var convolveUI = {
-	options: [
-		'sharpen',
-		'sobel x+y',
-		'sobel x',
-		'sobel y',
-		'prewitt x+y',
-		'prewitt x',
-		'prewitt y',
-		'edge detect 1',
-		'edge detect 2',
-		'emboss 1',
-		'emboss 2',
-		'emboss 3',
-	],
 	showInfo: function(event)
 	{
 		event.preventDefault();
 		var div = document.getElementById('convolveInfoDiv');
 		div.style.display = 'block';
-		centerElement(div, null, null);
+		centerElement(div);
 	},
 	hideInfo: function()
 	{
@@ -1526,8 +1512,8 @@ var convolveUI = {
 	{
 		var opSelect = document.createElement('SELECT');
 		opSelect.add(new Option('none', 'none', true, true));
-		for (var name of this.options)
-			opSelect.add(new Option(name, name));
+		for (var c of Convolutions)
+			opSelect.add(new Option(c.name, c.name));
 
 		opSelect.addEventListener('change', function(event) {
 			filter.value = opSelect.selectedIndex;
@@ -1541,7 +1527,7 @@ var convolveUI = {
 
 		var span = document.createElement('SPAN');
 		span.className = 'convAbs convAbsOff';
-		span.appendChild(document.createTextNode('|G|'));
+		span.appendChild(document.createTextNode('|\u0192|')); // &fnof;
 		span.addEventListener('click', function(event) {
 			filter.useAbsoluteValue = !filter.useAbsoluteValue;
 			span.className = 'convAbs convAbs' + (filter.useAbsoluteValue ? 'On' : 'Off');
@@ -1561,7 +1547,7 @@ var convolveUI = {
 		if (info === undefined) return;
 
 		var value = parseInt(info.value, 10);
-		if (!isNaN(value) && value == info.value && value > 0 && value <= this.options.length) {
+		if (!isNaN(value) && value == info.value && value > 0 && value <= Convolutions.length) {
 			opSelect.selectedIndex = value;
 			filter.value = value;
 		}
@@ -1825,7 +1811,7 @@ function showFilterCode(event)
 	svgCode.style.width = width;
 	if (svgCode.clientHeight > 450) svgCode.style.height = '450px';
 
-	centerElement(filterCodeDiv, null, null);
+	centerElement(filterCodeDiv);
 }
 function hideFilterCode()
 {

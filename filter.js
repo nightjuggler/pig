@@ -200,22 +200,6 @@ function createConvolveElement(kernel, order, inName, outName)
 	fe.setAttribute('kernelMatrix', kernel);
 	return fe;
 }
-var ConvolveKernel = {
-	Sharpen: [0, -1, 0, -1, 5, -1, 0, -1, 0],
-	SobelX: [-1, 0, 1, -2, 0, 2, -1, 0, 1],
-	SobelY: [-1, -2, -1, 0, 0, 0, 1, 2, 1],
-	PrewittX: [-1, 0, 1, -1, 0, 1, -1, 0, 1],
-	PrewittY: [-1, -1, -1, 0, 0, 0, 1, 1, 1],
-	EdgeDetect1: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
-	EdgeDetect2: [0, 1, 0, 1, -4, 1, 0, 1, 0],
-	Emboss1: [1, 0, 0, 0, 0, 0, 0, 0, -1],
-	Emboss2: [-2, -1, 0, -1, 1, 1, 0, 1, 2],
-	Emboss3: [-2, -2, 0, -2, 6, 0, 0, 0, 0],
-};
-(function() {
-	for (var name in ConvolveKernel)
-		ConvolveKernel['str' + name] = ConvolveKernel[name].join(' ');
-})();
 function addFilters(name1, name2, outName)
 {
 	var fe = document.createElementNS(svgNS, 'feComposite');
@@ -253,31 +237,9 @@ function addConvolutions(channels, kernelX, kernelY, abs)
 
 	return createFilter(channels, feList);
 }
-function createSVGSobelXY(channels, abs)
-{
-	return addConvolutions(channels, ConvolveKernel.strSobelX, ConvolveKernel.strSobelY, abs);
-}
-function createSVGPrewittXY(channels, abs)
-{
-	return addConvolutions(channels, ConvolveKernel.strPrewittX, ConvolveKernel.strPrewittY, abs);
-}
-var svgConvolutions = [
-	ConvolveKernel.strSharpen,
-	createSVGSobelXY,
-	ConvolveKernel.strSobelX,
-	ConvolveKernel.strSobelY,
-	createSVGPrewittXY,
-	ConvolveKernel.strPrewittX,
-	ConvolveKernel.strPrewittY,
-	ConvolveKernel.strEdgeDetect1,
-	ConvolveKernel.strEdgeDetect2,
-	ConvolveKernel.strEmboss1,
-	ConvolveKernel.strEmboss2,
-	ConvolveKernel.strEmboss3,
-];
 function createSVGConvolve(value, channels, abs)
 {
-	var convolution = svgConvolutions[value - 1];
+	var convolution = Convolutions[value - 1].forSVG;
 
 	if (typeof convolution === 'function')
 		return convolution(channels, abs);
@@ -1025,35 +987,50 @@ function addImages(image1, image2, channels)
 
 	return image2;
 }
-function applySobelXY(context, imageData, channels, abs)
+function Convolution(name, kernel)
 {
-	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.SobelX, abs);
-	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.SobelY, abs);
-	return addImages(gX, gY, channels);
+	this.name = name;
+	if (kernel !== undefined) {
+		this.forCanvas = kernel;
+		this.forSVG = kernel.join(' ');
+	}
 }
-function applyPrewittXY(context, imageData, channels, abs)
-{
-	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittX, abs);
-	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittY, abs);
-	return addImages(gX, gY, channels);
-}
-var convolutions = [
-	ConvolveKernel.Sharpen,
-	applySobelXY,
-	ConvolveKernel.SobelX,
-	ConvolveKernel.SobelY,
-	applyPrewittXY,
-	ConvolveKernel.PrewittX,
-	ConvolveKernel.PrewittY,
-	ConvolveKernel.EdgeDetect1,
-	ConvolveKernel.EdgeDetect2,
-	ConvolveKernel.Emboss1,
-	ConvolveKernel.Emboss2,
-	ConvolveKernel.Emboss3,
+var Convolutions = [
+new Convolution('sharpen',       [ 0, -1,  0, -1,  5, -1,  0, -1,  0]),
+new Convolution('sobel x+y'),
+new Convolution('sobel x',       [-1,  0,  1, -2,  0,  2, -1,  0,  1]),
+new Convolution('sobel y',       [-1, -2, -1,  0,  0,  0,  1,  2,  1]),
+new Convolution('prewitt x+y'),
+new Convolution('prewitt x',     [-1,  0,  1, -1,  0,  1, -1,  0,  1]),
+new Convolution('prewitt y',     [-1, -1, -1,  0,  0,  0,  1,  1,  1]),
+new Convolution('edge detect 1', [-1, -1, -1, -1,  8, -1, -1, -1, -1]),
+new Convolution('edge detect 2', [ 0,  1,  0,  1, -4,  1,  0,  1,  0]),
+new Convolution('emboss 1',      [ 1,  0,  0,  0,  0,  0,  0,  0, -1]),
+new Convolution('emboss 2',      [-2, -1,  0, -1,  1,  1,  0,  1,  2]),
+new Convolution('emboss 3',      [-2, -2,  0, -2,  6,  0,  0,  0,  0]),
 ];
+function createXYConvolutionFunctions(i)
+{
+	var c = Convolutions[i];
+	var cx = Convolutions[i + 1];
+	var cy = Convolutions[i + 2];
+
+	c.forCanvas = function(context, imageData, channels, abs)
+	{
+		var gX = convolve3x3(context, imageData, channels, cx.forCanvas, abs);
+		var gY = convolve3x3(context, imageData, channels, cy.forCanvas, abs);
+		return addImages(gX, gY, channels);
+	}
+	c.forSVG = function(channels, abs)
+	{
+		return addConvolutions(channels, cx.forSVG, cy.forSVG, abs);
+	}
+}
+createXYConvolutionFunctions(1); // sobel x+y
+createXYConvolutionFunctions(4); // prewitt x+y
 function applyConvolution(context, imageData, value, channels, useAbsoluteValue)
 {
-	var convolution = convolutions[value - 1];
+	var convolution = Convolutions[value - 1].forCanvas;
 
 	if (typeof convolution === 'function')
 		return convolution(context, imageData, channels, useAbsoluteValue);
