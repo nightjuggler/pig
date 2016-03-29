@@ -38,8 +38,12 @@ function createFilter(channels, fe)
 	filterNode.setAttribute('id', 'filter' + filterId);
 	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
 
-	for (var i = 1; i < arguments.length; ++i)
-		filterNode.appendChild(arguments[i]);
+	if (Array.isArray(fe))
+		for (var i = 0; i < fe.length; ++i)
+			filterNode.appendChild(fe[i]);
+	else
+		for (var i = 1; i < arguments.length; ++i)
+			filterNode.appendChild(arguments[i]);
 
 	if (channels > 0 && channels < 7)
 	{
@@ -187,9 +191,9 @@ function createSVGThreshold(amount, channels)
 function createConvolveElement(kernel, order, inName, outName)
 {
 	var fe = document.createElementNS(svgNS, 'feConvolveMatrix');
-	if (typeof inName === 'string')
+	if (inName)
 		fe.setAttribute('in', inName);
-	if (typeof outName === 'string')
+	if (outName)
 		fe.setAttribute('result', outName);
 	fe.setAttribute('preserveAlpha', 'true');
 	fe.setAttribute('order', order);
@@ -206,30 +210,56 @@ var ConvolveKernel = {
 	EdgeDetect2: [0, 1, 0, 1, -4, 1, 0, 1, 0],
 	Emboss1: [1, 0, 0, 0, 0, 0, 0, 0, -1],
 	Emboss2: [-2, -1, 0, -1, 1, 1, 0, 1, 2],
+	Emboss3: [-2, -2, 0, -2, 6, 0, 0, 0, 0],
 };
 (function() {
 	for (var name in ConvolveKernel)
 		ConvolveKernel['str' + name] = ConvolveKernel[name].join(' ');
 })();
-function addConvolveFilters(channels, kernelX, kernelY)
+function addFilters(name1, name2, outName)
 {
-	var gX = createConvolveElement(kernelX, '3 3', 'SourceGraphic', 'Gx');
-	var gY = createConvolveElement(kernelY, '3 3', 'SourceGraphic', 'Gy');
 	var fe = document.createElementNS(svgNS, 'feComposite');
-	fe.setAttribute('in', 'Gx');
-	fe.setAttribute('in2', 'Gy');
+	if (name1)
+		fe.setAttribute('in', name1);
+	fe.setAttribute('in2', name2);
+	if (outName)
+		fe.setAttribute('result', outName);
 	fe.setAttribute('operator', 'arithmetic');
 	fe.setAttribute('k2', '1');
 	fe.setAttribute('k3', '1');
-	return createFilter(channels, gX, gY, fe);
+	return fe;
 }
-function createSVGSobelXY(channels)
+function addConvolveFilters(feList, kernel1, kernel2, name1, name2, outName)
 {
-	return addConvolveFilters(channels, ConvolveKernel.strSobelX, ConvolveKernel.strSobelY);
+	feList.push(createConvolveElement(kernel2, '3 3', 'SourceGraphic', name2));
+	feList.push(createConvolveElement(kernel1, '3 3', 'SourceGraphic', name1));
+	feList.push(addFilters(name1, name2, outName));
+	return feList;
 }
-function createSVGPrewittXY(channels)
+function addConvolveReverse(feList, kernel, name2, name1)
 {
-	return addConvolveFilters(channels, ConvolveKernel.strPrewittX, ConvolveKernel.strPrewittY);
+	var reverseKernel = kernel.split(' ').reverse().join(' ');
+	return addConvolveFilters(feList, kernel, reverseKernel, name1, name2, name1);
+}
+function addConvolutions(channels, kernelX, kernelY, abs)
+{
+	var feList = [];
+	if (abs) {
+		addConvolveReverse(feList, kernelX, 'x2', 'x');
+		addConvolveReverse(feList, kernelY, 'y2', 'y');
+		feList.push(addFilters('x', 'y'));
+	} else
+		addConvolveFilters(feList, kernelX, kernelY, 'x', 'y');
+
+	return createFilter(channels, feList);
+}
+function createSVGSobelXY(channels, abs)
+{
+	return addConvolutions(channels, ConvolveKernel.strSobelX, ConvolveKernel.strSobelY, abs);
+}
+function createSVGPrewittXY(channels, abs)
+{
+	return addConvolutions(channels, ConvolveKernel.strPrewittX, ConvolveKernel.strPrewittY, abs);
 }
 var svgConvolutions = [
 	ConvolveKernel.strSharpen,
@@ -243,13 +273,16 @@ var svgConvolutions = [
 	ConvolveKernel.strEdgeDetect2,
 	ConvolveKernel.strEmboss1,
 	ConvolveKernel.strEmboss2,
+	ConvolveKernel.strEmboss3,
 ];
-function createSVGConvolve(value, channels)
+function createSVGConvolve(value, channels, abs)
 {
 	var convolution = svgConvolutions[value - 1];
 
 	if (typeof convolution === 'function')
-		return convolution(channels);
+		return convolution(channels, abs);
+	if (abs)
+		return createFilter(channels, addConvolveReverse([], convolution, 'c2'));
 
 	return createFilter(channels, createConvolveElement(convolution, '3 3'));
 }
@@ -893,7 +926,7 @@ function applyThreshold(d, amount, channels)
 		if (setB) d[i + 2] = (d[i + 2] < amount ? 0 : 255);
 	}
 }
-function convolve3x3(context, inData, channels, kernel)
+function convolve3x3(context, inData, channels, kernel, abs)
 {
 	var setR = ((channels & 1) === 1);
 	var setG = ((channels & 2) === 2);
@@ -930,28 +963,42 @@ function convolve3x3(context, inData, channels, kernel)
 		{
 			var xLft = x === 0 ? 0 : -4;
 			var xRgt = x === width - 1 ? 0 : 4;
+/*
+	"The values in the kernel matrix are applied such that the kernel matrix is rotated 180 degrees
+	relative to the source and destination images in order to match convolution theory as described
+	in many computer graphics textbooks."
+	(https://www.w3.org/TR/filter-effects-1/#feConvolveMatrixElement)
+*/
+			// 8 7 6
+			// 5 4 3
+			// 2 1 0
 
-			var i8 = i + yUp + xLft;
 			var i7 = i + yUp;
-			var i6 = i + yUp + xRgt;
+			var i8 = i7 + xLft;
+			var i6 = i7 + xRgt;
 			var i5 = i + xLft;
 			var i3 = i + xRgt;
-			var i2 = i + yDn + xLft;
 			var i1 = i + yDn;
-			var i0 = i + yDn + xRgt;
+			var i2 = i1 + xLft;
+			var i0 = i1 + xRgt;
 
-			d[i] = setR ?
-				k8*s[i8] + k7*s[i7] + k6*s[i6] +
+			var r = k8*s[i8] + k7*s[i7] + k6*s[i6] +
 				k5*s[i5] + k4*s[i ] + k3*s[i3] +
-				k2*s[i2] + k1*s[i1] + k0*s[i0] : s[i];
-			d[i+1] = setG ?
-				k8*s[i8+1] + k7*s[i7+1] + k6*s[i6+1] +
+				k2*s[i2] + k1*s[i1] + k0*s[i0];
+			var g = k8*s[i8+1] + k7*s[i7+1] + k6*s[i6+1] +
 				k5*s[i5+1] + k4*s[i +1] + k3*s[i3+1] +
-				k2*s[i2+1] + k1*s[i1+1] + k0*s[i0+1] : s[i+1];
-			d[i+2] = setB ?
-				k8*s[i8+2] + k7*s[i7+2] + k6*s[i6+2] +
+				k2*s[i2+1] + k1*s[i1+1] + k0*s[i0+1];
+			var b = k8*s[i8+2] + k7*s[i7+2] + k6*s[i6+2] +
 				k5*s[i5+2] + k4*s[i +2] + k3*s[i3+2] +
-				k2*s[i2+2] + k1*s[i1+2] + k0*s[i0+2] : s[i+2];
+				k2*s[i2+2] + k1*s[i1+2] + k0*s[i0+2];
+			if (abs) {
+				r = Math.abs(r);
+				g = Math.abs(g);
+				b = Math.abs(b);
+			}
+			d[i  ] = setR ? r : s[i  ];
+			d[i+1] = setG ? g : s[i+1];
+			d[i+2] = setB ? b : s[i+2];
 			d[i+3] = s[i+3];
 			i += 4;
 		}
@@ -978,16 +1025,16 @@ function addImages(image1, image2, channels)
 
 	return image2;
 }
-function applySobelXY(context, imageData, channels)
+function applySobelXY(context, imageData, channels, abs)
 {
-	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.SobelX);
-	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.SobelY);
+	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.SobelX, abs);
+	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.SobelY, abs);
 	return addImages(gX, gY, channels);
 }
-function applyPrewittXY(context, imageData, channels)
+function applyPrewittXY(context, imageData, channels, abs)
 {
-	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittX);
-	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittY);
+	var gX = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittX, abs);
+	var gY = convolve3x3(context, imageData, channels, ConvolveKernel.PrewittY, abs);
 	return addImages(gX, gY, channels);
 }
 var convolutions = [
@@ -1002,13 +1049,14 @@ var convolutions = [
 	ConvolveKernel.EdgeDetect2,
 	ConvolveKernel.Emboss1,
 	ConvolveKernel.Emboss2,
+	ConvolveKernel.Emboss3,
 ];
-function applyConvolution(context, imageData, value, channels)
+function applyConvolution(context, imageData, value, channels, useAbsoluteValue)
 {
 	var convolution = convolutions[value - 1];
 
 	if (typeof convolution === 'function')
-		return convolution(context, imageData, channels);
+		return convolution(context, imageData, channels, useAbsoluteValue);
 
-	return convolve3x3(context, imageData, channels, convolution);
+	return convolve3x3(context, imageData, channels, convolution, useAbsoluteValue);
 }
