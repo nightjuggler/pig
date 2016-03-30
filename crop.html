@@ -1671,7 +1671,7 @@ function swapXYFilters()
 			option.swapIndex = filterIndex[swapName];
 
 			var swapOption = filterOptions[option.swapIndex];
-			swapOption.swapIndex = filterIndex[option.name];
+			swapOption.swapIndex = filterIndex[name];
 
 			var createSVGFilter = option.createSVGFilter;
 			option.createSVGFilter = swapOption.createSVGFilter;
@@ -1737,6 +1737,15 @@ function getURL()
 		if ((channels & 1) !== 0) rgb += 'r';
 		if ((channels & 2) !== 0) rgb += 'g';
 		if ((channels & 4) !== 0) rgb += 'b';
+
+		// When creating filters from the query string, the rotation angle will be 0.
+		// The rotation angle from the query string won't be applied until after the
+		// image is loaded. So if we're currently rotated 90 or 270 degrees, we have
+		// to swap the names of filters like blur-x and blur-y in the query string so
+		// they'll be swapped back to their current values after the image is loaded.
+
+		if ((rotateAngle === 90 || rotateAngle === 270) && option.swapIndex !== null)
+			option = filterOptions[option.swapIndex];
 
 		var infoList = [option.name, rgb];
 
