@@ -1083,6 +1083,27 @@ function imageLoaded(event)
 	init();
 	hideLoading();
 
+	if (queryString.inverseAspectRatio) {
+		queryString.inverseAspectRatio = false;
+		var checkbox = document.getElementById("inverseAspectRatioCheckbox");
+		if (!checkbox.disabled) {
+			checkbox.checked = true;
+			toggleInverseAspectRatio();
+		}
+	}
+	if (queryString.cropGeometry) {
+		var [w, h, x, y] = queryString.cropGeometry;
+		queryString.cropGeometry = null;
+
+		cropWidthField.value = w; changeCropWidth();
+		cropXField.value = x; changeCropX();
+		cropYField.value = y; changeCropY();
+		crop();
+	}
+	if (queryString.rotateAngle !== 0) {
+		rotatePhoto(queryString.rotateAngle);
+		queryString.rotateAngle = 0;
+	}
 	if (queryString.overlayCanvas) {
 		queryString.overlayCanvas = false;
 		document.getElementById("overlayCanvasLink").click();
@@ -1731,9 +1752,16 @@ function getURL()
 
 	url = url.protocol + '//' + url.host + url.pathname;
 	url += '?f=' + filterList.join('/');
-	if (imageFiles === undefined)
+	if (imageFiles === undefined) {
+		if (cropped)
+			url += '&c=' + cropWidth + 'x' + cropHeight + '+'
+				+ cropXField.value + '+' + cropYField.value;
+		if (rotateAngle !== 0)
+			url += '&r=' + rotateAngle;
+		if (cropInverseAspectRatio)
+			url += '&iar';
 		url += '&i=' + document.getElementById('fileNameField').value;
-
+	}
 	return url;
 }
 function showFilterCode(event)
@@ -2119,12 +2147,44 @@ function createFilterRow(rowNumber, info)
 
 	return tableRow;
 }
+function parseCropGeometry(v)
+{
+	var i, j, s, n, g = [];
+
+	if ((i = v.indexOf('x')) < 0) return;
+	s = v.substr(0, i);
+	n = parseInt(s, 10);
+	if (isNaN(n) || n != s || n <= 0) return;
+	g.push(n);
+
+	if ((j = v.indexOf('+', ++i)) < 0) return;
+	s = v.substr(i, j-i);
+	n = parseInt(s, 10);
+	if (isNaN(n) || n != s || n <= 0) return;
+	g.push(n);
+
+	if ((i = v.indexOf('+', ++j)) < 0) return;
+	s = v.substr(j, i-j);
+	n = parseInt(s, 10);
+	if (isNaN(n) || n != s || n < 0) return;
+	g.push(n);
+
+	s = v.substr(i+1);
+	n = parseInt(s, 10);
+	if (isNaN(n) || n != s || n < 0) return;
+	g.push(n);
+
+	queryString.cropGeometry = g;
+}
 function parseQueryString()
 {
 	queryString = {
 		filters: null,
 		overlayCanvas: false,
 		selectedImage: 0,
+		cropGeometry: null,
+		rotateAngle: 0,
+		inverseAspectRatio: false,
 	};
 
 	var q = window.location.search;
@@ -2137,17 +2197,22 @@ function parseQueryString()
 			queryString.overlayCanvas = true;
 			continue;
 		}
-
+		if (s === 'iar') {
+			queryString.inverseAspectRatio = true;
+			continue;
+		}
 		var i = s.indexOf('=');
 		if (i < 1 || i === s.length - 1) continue;
 		var k = s.substr(0, i);
 		var v = s.substr(i + 1);
 
-		if (k === 'f') {
+		if (k === 'c')
+			parseCropGeometry(v);
+
+		else if (k === 'f')
 			queryString.filters = v;
-			continue;
-		}
-		if (k === 'i') {
+
+		else if (k === 'i') {
 			if (imageNames !== undefined) {
 				i = imageNames.indexOf(v);
 				if (i >= 0) {
@@ -2157,6 +2222,10 @@ function parseQueryString()
 			}
 			imagePath = '';
 			imageNames = [v];
+		}
+		else if (k === 'r') {
+			if (v === '90' || v === '180' || v === '270')
+				queryString.rotateAngle = +v;
 		}
 	}
 }
