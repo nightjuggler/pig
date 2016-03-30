@@ -928,14 +928,15 @@ function rotatePhoto(angle)
 	var oldCropperTop = cropperTop - photoMinY;
 	if (angle === 90 || angle === 270) {
 		turnPhotoDiv();
-		swapXYFilters();
+		swapXYFilters(angle);
 		var width = cropperWidth;
 		var height = cropperHeight;
 		cropperWidth = height;
 		cropperHeight = width;
 		cropper.style.width = (cropperWidth - 4) + 'px';
 		cropper.style.height = (cropperHeight - 4) + 'px';
-	}
+	} else
+		reverseLRFilters();
 	if (angle === 90) {
 		cropperLeft = photoMaxX - oldCropperTop - cropperWidth;
 		cropperTop = photoMinY + oldCropperLeft;
@@ -1429,11 +1430,20 @@ var blurUI = {
 	},
 	setValueForURL: function(filter, infoList)
 	{
+		var name = filter.option.name;
+		var changeSign = false;
+		if (name === 'd-blur-x') {
+			if (rotateAngle === 180 || rotateAngle === 90) changeSign = true;
+		} else if (name === 'd-blur-y') {
+			if (rotateAngle === 180 || rotateAngle === 270) changeSign = true;
+		}
+		var value = changeSign ? -filter.value : filter.value;
+
 		if (!filter.edgeMode.defaultSelected) {
-			infoList.push(filter.value);
+			infoList.push(value);
 			infoList.push(filter.edgeMode.index);
-		} else if (filter.value !== 0)
-			infoList.push(filter.value);
+		} else if (value !== 0)
+			infoList.push(value);
 	},
 	getInfo: function(filter)
 	{
@@ -1678,7 +1688,7 @@ function Filter(tableCell, info)
 	this.manage = true;
 	this.id = 0;
 }
-function swapXYFilters()
+function swapXYFilters(angle)
 {
 	for (var option of filterOptions)
 	{
@@ -1700,9 +1710,33 @@ function swapXYFilters()
 	for (var filter of filters)
 		if (filter.option.swapIndex !== null)
 		{
+			var name = filter.option.name;
+			var changeSign = false;
+			if (name === 'd-blur-x') {
+				if (angle === 270) changeSign = true;
+			} else if (name === 'd-blur-y') {
+				if (angle === 90) changeSign = true;
+			}
+			if (changeSign) {
+				filter.value = -filter.value;
+				filter.sliderElement.value = filter.value;
+				filter.inputElement.value = filter.value;
+			}
 			filter.selectElement.selectedIndex = filter.option.swapIndex;
 			filter.option = filterOptions[filter.option.swapIndex];
 		}
+}
+function reverseLRFilters()
+{
+	for (var filter of filters)
+	{
+		var name = filter.option.name;
+		if (name === 'd-blur-x' || name === 'd-blur-y') {
+			filter.value = -filter.value;
+			filter.sliderElement.value = filter.value;
+			filter.inputElement.value = filter.value;
+		}
+	}
 }
 function markupFilterStyle(inData)
 {
