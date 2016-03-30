@@ -1539,22 +1539,30 @@ var convolveUI = {
 		for (var c of Convolutions)
 			opSelect.add(new Option(c.name, c.name));
 
-		opSelect.addEventListener('change', function(event) {
-			filter.value = opSelect.selectedIndex;
-			manageFilters(filter);
-		}, false);
-
 		var infoLink = document.createElement('A');
 		infoLink.href = '#';
 		infoLink.appendChild(document.createTextNode('?'));
 		infoLink.addEventListener('click', this.showInfo, false);
 
 		var span = document.createElement('SPAN');
-		span.className = 'convAbs convAbsOff';
 		span.appendChild(document.createTextNode('|\u0192|')); // &fnof;
+		span.className = 'convAbs convAbsOff';
+		span.style.display = 'none';
 		span.addEventListener('click', function(event) {
 			filter.useAbsoluteValue = !filter.useAbsoluteValue;
 			span.className = 'convAbs convAbs' + (filter.useAbsoluteValue ? 'On' : 'Off');
+			manageFilters(filter);
+		}, false);
+
+		opSelect.addEventListener('change', function(event) {
+			filter.value = opSelect.selectedIndex;
+			if (filter.value > 0 && Convolutions[filter.value - 1].allowAbs) {
+				span.style.display = 'inline';
+			} else {
+				span.className = 'convAbs convAbsOff';
+				span.style.display = 'none';
+				filter.useAbsoluteValue = false;
+			}
 			manageFilters(filter);
 		}, false);
 
@@ -1571,14 +1579,20 @@ var convolveUI = {
 		if (info === undefined) return;
 
 		var value = parseInt(info.value, 10);
-		if (!isNaN(value) && value == info.value && value > 0 && value <= Convolutions.length) {
-			opSelect.selectedIndex = value;
-			filter.value = value;
-		}
-		if (info.extraValue === '1') {
-			span.className = 'convAbs convAbsOn';
-			filter.useAbsoluteValue = true;
-		}
+
+		if (isNaN(value) || value != info.value || value <= 0 || value > Convolutions.length) return;
+
+		opSelect.selectedIndex = value;
+		filter.value = value;
+
+		if (!Convolutions[value - 1].allowAbs) return;
+
+		span.style.display = 'inline';
+
+		if (info.extraValue !== '1') return;
+
+		span.className = 'convAbs convAbsOn';
+		filter.useAbsoluteValue = true;
 	},
 	remove: function(filter)
 	{
