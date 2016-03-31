@@ -2476,6 +2476,37 @@ function copyCropGeometry(event)
 	document.getElementById("cropGeometry").select();
 	copyToClipboard();
 }
+function updatePolarFilters()
+{
+	var polarIndex = filterIndex['polar'];
+	var depolarIndex = filterIndex['depolar'];
+	var polar = filterOptions[polarIndex];
+	var depolar = filterOptions[depolarIndex];
+	var updateFilters = false;
+	var nameSuffix;
+
+	if (polar.createSVGFilter === svgCannotImplement) {
+		polar.createSVGFilter = createSVGPolar;
+		depolar.createSVGFilter = createSVGReversePolar;
+		nameSuffix = '';
+	} else {
+		polar.createSVGFilter = svgCannotImplement;
+		depolar.createSVGFilter = svgCannotImplement;
+		nameSuffix = ' *';
+	}
+	for (var filter of filters)
+	{
+		filter.selectElement.options[polarIndex].text = 'polar' + nameSuffix;
+		filter.selectElement.options[depolarIndex].text = 'depolar' + nameSuffix;
+
+		if (filter.option === polar || filter.option === depolar) {
+			filter.manage = true;
+			updateFilters = true;
+		}
+	}
+	if (updateFilters)
+		applyFilters();
+}
 function documentKeyDown(event)
 {
 	if (event.target instanceof HTMLInputElement ||
@@ -2501,6 +2532,8 @@ function documentKeyDown(event)
 			return true;
 		if (document.getElementById("canvas").style.display === 'block')
 			drawCanvas();
+	} else if (key === 'x' || key === 'U+0058') {
+		updatePolarFilters();
 	} else
 		return true;
 

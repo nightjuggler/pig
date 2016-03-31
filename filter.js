@@ -1,4 +1,5 @@
 var svgNS = 'http://www.w3.org/2000/svg';
+var xlinkNS = 'http://www.w3.org/1999/xlink';
 var svgFilterId = 0;
 var svgFilterIdBin = [];
 var channelMap = [['R', 1], ['G', 2], ['B', 4]];
@@ -247,6 +248,41 @@ function createSVGConvolve(value, channels, abs)
 		return createFilter(channels, addConvolveReverse([], convolution, 'c2'));
 
 	return createFilter(channels, createConvolveElement(convolution, '3 3'));
+}
+var divWidth, divHeight;
+function createSVGPolar(value, channels, edgeMode, reverse)
+{
+	var info = {
+		radius: Polar.Radii[value],
+		width: divWidth,
+		height: divHeight,
+	};
+
+	if (reverse)
+		info.reverse = true;
+
+	createPolarDisplacementMap(info);
+
+	var fe1 = document.createElementNS(svgNS, 'feImage');
+	fe1.setAttributeNS(xlinkNS, 'href', info.url);
+	fe1.setAttribute('x', 0);
+	fe1.setAttribute('y', 0);
+	fe1.setAttribute('width', info.width);
+	fe1.setAttribute('height', info.height);
+	fe1.setAttribute('result', 'map');
+
+	var fe2 = document.createElementNS(svgNS, 'feDisplacementMap');
+	fe2.setAttribute('in', 'SourceGraphic');
+	fe2.setAttribute('in2', 'map');
+	fe2.setAttribute('scale', info.scale);
+	fe2.setAttribute('xChannelSelector', 'R');
+	fe2.setAttribute('yChannelSelector', 'G');
+
+	return createFilter(channels, fe1, fe2);
+}
+function createSVGReversePolar(value, channels, edgeMode)
+{
+	return createSVGPolar(value, channels, edgeMode, true);
 }
 function createGaussianBlur(xRadius, yRadius, edgeMode)
 {
@@ -659,6 +695,97 @@ function setChannelFlags(info, channels)
 		info.setB = true;
 		info.setA = true;
 	}
+}
+var hiddenCanvas;
+var polarMapCache = {};
+function createPolarDisplacementMap(info)
+{
+	var width = info.width;
+	var height = info.height;
+	info.scale = 2 * Math.max(width, height);
+	var scale = info.scale;
+
+	var reverse = (typeof info.reverse === 'boolean') ? info.reverse : false;
+	var radius = ((typeof info.radius === 'function') ? info.radius : Polar.RadiusHalfDiagonal)(width, height);
+	var radiusScale = radius / height;
+
+	// Multiply degrees by pi/180 to convert to radians.
+	// Note that when doing a reverse polar transform, Math.atan2() will always return an angle
+	// between -pi and pi (-180 and 180 degrees). Thus minAngle should be >= -180, and maxAngle
+	// should be <= 180.
+
+	var minAngle = (typeof info.minAngle === 'number' ? info.minAngle : -180) * Math.PI/180;
+	var maxAngle = (typeof info.maxAngle === 'number' ? info.maxAngle :  180) * Math.PI/180;
+	var angleScale = (maxAngle - minAngle) / (width - 1);
+
+	var cacheKey = [width, height, radius, reverse, minAngle, maxAngle].join('_');
+	info.url = polarMapCache[cacheKey];
+	if (info.url) return;
+
+	if (hiddenCanvas === undefined)
+		hiddenCanvas = document.createElement("canvas");
+
+	hiddenCanvas.width = width;
+	hiddenCanvas.height = height;
+
+	var context = hiddenCanvas.getContext("2d");
+	var mapData = context.createImageData(width, height);
+	var d = mapData.data;
+
+	var centerX = Math.round(width / 2);
+	var centerY = Math.round(height / 2);
+
+	var x, y, hypot, angle;
+
+	for (var j = 0; j < height; ++j)
+		for (var i = 0; i < width; ++i)
+		{
+			if (reverse) {
+				var deltaY = j - centerY;
+				var deltaX = i - centerX;
+
+				hypot = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
+				angle = Math.atan2(deltaY, deltaX);
+
+				y = Math.round(hypot / radiusScale);
+				x = Math.round((angle - minAngle) / angleScale);
+			} else {
+				hypot = j * radiusScale;
+				angle = minAngle + i * angleScale;
+
+				x = centerX + Math.round(hypot * Math.cos(angle));
+				y = centerY + Math.round(hypot * Math.sin(angle));
+			}
+
+			var edge = false;
+			if (x < 0) {
+				edge = true; x = 0;
+			} else if (x >= width) {
+				edge = true; x = width - 1;
+			}
+			if (y < 0) {
+				edge = true; y = 0;
+			} else if (y >= height) {
+				edge = true; y = height - 1;
+			}
+
+			var di = (j * width + i) * 4;
+
+			d[di  ] = 255 * ((x - i)/scale + 0.5);
+			d[di+1] = 255 * ((y - j)/scale + 0.5);
+			d[di+2] = 0;
+			d[di+3] = 255;
+
+			x = i + scale * (d[di  ]/255 - 0.5);
+			y = j + scale * (d[di+1]/255 - 0.5);
+
+			if (x < 0) d[di  ] += 1; else if (x >= width)  d[di  ] -= 1;
+			if (y < 0) d[di+1] += 1; else if (y >= height) d[di+1] -= 1;
+		}
+
+	context.putImageData(mapData, 0, 0);
+
+	polarMapCache[cacheKey] = info.url = hiddenCanvas.toDataURL("image/png");
 }
 function polarTransform(context, inData, channels, info)
 {
