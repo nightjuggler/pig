@@ -2478,6 +2478,10 @@ function copyCropGeometry(event)
 }
 function updatePolarFilters()
 {
+	if (cropped) return;
+	var cropButton = document.getElementById('cropButton');
+	var undoButton = document.getElementById('undoButton');
+
 	var polarIndex = filterIndex['polar'];
 	var depolarIndex = filterIndex['depolar'];
 	var polar = filterOptions[polarIndex];
@@ -2486,10 +2490,14 @@ function updatePolarFilters()
 	var nameSuffix;
 
 	if (polar.createSVGFilter === svgCannotImplement) {
+		cropButton.disabled = true;
+		undoButton.disabled = true;
 		polar.createSVGFilter = createSVGPolar;
 		depolar.createSVGFilter = createSVGReversePolar;
 		nameSuffix = '';
 	} else {
+		cropButton.disabled = false;
+		undoButton.disabled = false;
 		polar.createSVGFilter = svgCannotImplement;
 		depolar.createSVGFilter = svgCannotImplement;
 		nameSuffix = ' *';

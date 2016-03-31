@@ -709,16 +709,11 @@ function createPolarDisplacementMap(info)
 	var radius = ((typeof info.radius === 'function') ? info.radius : Polar.RadiusHalfDiagonal)(width, height);
 	var radiusScale = radius / height;
 
-	// Multiply degrees by pi/180 to convert to radians.
-	// Note that when doing a reverse polar transform, Math.atan2() will always return an angle
-	// between -pi and pi (-180 and 180 degrees). Thus minAngle should be >= -180, and maxAngle
-	// should be <= 180.
-
-	var minAngle = (typeof info.minAngle === 'number' ? info.minAngle : -180) * Math.PI/180;
-	var maxAngle = (typeof info.maxAngle === 'number' ? info.maxAngle :  180) * Math.PI/180;
+	var minAngle = -180 * Math.PI/180;
+	var maxAngle =  180 * Math.PI/180;
 	var angleScale = (maxAngle - minAngle) / (width - 1);
 
-	var cacheKey = [width, height, radius, reverse, minAngle, maxAngle].join('_');
+	var cacheKey = [width, height, radius, reverse].join('_');
 	info.url = polarMapCache[cacheKey];
 	if (info.url) return;
 
