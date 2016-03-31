@@ -888,7 +888,6 @@ function applyThreshold(d, amount, channels)
 		if (setB) d[i + 2] = (d[i + 2] < amount ? 0 : 255);
 	}
 }
-var rotateAngle;
 function convolve3x3(context, inData, channels, kernel, abs)
 {
 	var setR = ((channels & 1) === 1);
@@ -913,27 +912,9 @@ function convolve3x3(context, inData, channels, kernel, abs)
 	var yDelta = width * 4;
 	var i0, i1, i2, i3, i5, i6, i7, i8;
 
-	if (rotateAngle === 90) {
-		i0 = 6; i1 = 3; i2 = 0; // 6 3 0
-		i3 = 7;         i5 = 1; // 7 4 1
-		i6 = 8; i7 = 5; i8 = 2; // 8 5 2
-	} else if (rotateAngle === 180) {
-		i0 = 8; i1 = 7; i2 = 6; // 8 7 6
-		i3 = 5;         i5 = 3; // 5 4 3
-		i6 = 2; i7 = 1; i8 = 0; // 2 1 0
-	} else if (rotateAngle === 270) {
-		i0 = 2; i1 = 5; i2 = 8; // 2 5 8
-		i3 = 1;         i5 = 7; // 1 4 7
-		i6 = 0; i7 = 3; i8 = 6; // 0 3 6
-	} else {
-		i0 = 0; i1 = 1; i2 = 2; // 0 1 2
-		i3 = 3;         i5 = 5; // 3 4 5
-		i6 = 6; i7 = 7; i8 = 8; // 6 7 8
-	}
-
-	var k0 = kernel[i0], k1 = kernel[i1], k2 = kernel[i2];
-	var k3 = kernel[i3], k4 = kernel[ 4], k5 = kernel[i5];
-	var k6 = kernel[i6], k7 = kernel[i7], k8 = kernel[i8];
+	var k0 = kernel[0], k1 = kernel[1], k2 = kernel[2];
+	var k3 = kernel[3], k4 = kernel[4], k5 = kernel[5];
+	var k6 = kernel[6], k7 = kernel[7], k8 = kernel[8];
 
 	var i = 0;
 	for (var y = 0; y < height; ++y)

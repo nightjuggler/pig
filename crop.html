@@ -366,6 +366,7 @@ var imageNames;
 var imageFiles;
 var filters = [];
 var filterIndex = {};
+var hiddenCanvas;
 var queryString;
 var copySupported = true;
 var showCropGeometry;
@@ -1187,26 +1188,13 @@ function drawCanvas()
 {
 	if (photo.src === "") return null;
 
-	var canvas = document.getElementById("canvas");
+	if (hiddenCanvas === undefined)
+		hiddenCanvas = document.createElement("canvas");
 
-	if (rotateAngle === 0 || rotateAngle === 180) {
-		canvas.width = divWidth;
-		canvas.height = divHeight;
-	} else {
-		canvas.width = divHeight;
-		canvas.height = divWidth;
-	}
+	hiddenCanvas.width = divWidth;
+	hiddenCanvas.height = divHeight;
 
-	var context = canvas.getContext("2d");
-
-	if (rotateAngle === 0)
-		context.setTransform(1, 0, 0, 1, 0, 0);
-	else if (rotateAngle === 90)
-		context.setTransform(0, 1, -1, 0, canvas.width, 0);
-	else if (rotateAngle === 180)
-		context.setTransform(-1, 0, 0, -1, canvas.width, canvas.height);
-	else if (rotateAngle === 270)
-		context.setTransform(0, -1, 1, 0, 0, canvas.height);
+	var context = hiddenCanvas.getContext("2d");
 
 	if (cropped)
 		context.drawImage(photo, +cropXField.value, +cropYField.value,
@@ -1216,7 +1204,7 @@ function drawCanvas()
 
 	var imageData;
 	try {
-		imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+		imageData = context.getImageData(0, 0, divWidth, divHeight);
 	} catch (exception) {
 		if (exception instanceof DOMException && exception.name === 'SecurityError')
 			showFailed(exception);
@@ -1235,10 +1223,36 @@ function drawCanvas()
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
 		var info = option.ui.getInfo ? option.ui.getInfo(filter) : undefined;
 
+		var name = filter.option.name;
+		if (name === 'd-blur-x') {
+			if (rotateAngle === 180 || rotateAngle === 90) amount = -amount;
+		} else if (name === 'd-blur-y') {
+			if (rotateAngle === 180 || rotateAngle === 270) amount = -amount;
+		}
+
 		imageData = option.applyFilter(context, imageData, amount, filter.channels, info);
 	}
 
 	context.putImageData(imageData, 0, 0);
+
+	var canvas = document.getElementById("canvas");
+	context = canvas.getContext("2d");
+
+	if (rotateAngle === 0 || rotateAngle === 180) {
+		canvas.width = divWidth;
+		canvas.height = divHeight;
+		if (rotateAngle === 180)
+			context.setTransform(-1, 0, 0, -1, canvas.width, canvas.height);
+	} else {
+		canvas.width = divHeight;
+		canvas.height = divWidth;
+		if (rotateAngle === 90)
+			context.setTransform(0, 1, -1, 0, canvas.width, 0);
+		else
+			context.setTransform(0, -1, 1, 0, 0, canvas.height); // rotateAngle === 270
+	}
+
+	context.drawImage(hiddenCanvas, 0, 0);
 	return canvas;
 }
 function saveImage(event)
@@ -1700,12 +1714,16 @@ function swapXYFilters(angle)
 			var swapOption = filterOptions[option.swapIndex];
 			swapOption.swapIndex = filterIndex[name];
 
-			var createSVGFilter = option.createSVGFilter;
+			var fn = option.createSVGFilter;
 			option.createSVGFilter = swapOption.createSVGFilter;
-			swapOption.createSVGFilter = createSVGFilter;
-		} else if (name.substr(-2) !== '-y') {
-			option.swapIndex = null;
+			swapOption.createSVGFilter = fn;
+
+			fn = option.applyFilter;
+			option.applyFilter = swapOption.applyFilter;
+			swapOption.applyFilter = fn;
 		}
+		else if (name.substr(-2) !== '-y')
+			option.swapIndex = null;
 	}
 	for (var filter of filters)
 		if (filter.option.swapIndex !== null)
@@ -2470,6 +2488,19 @@ function documentKeyDown(event)
 		document.getElementById("cropGeometryDiv").style.display = showCropGeometry ? 'block' : 'none';
 	} else if (key === 'o' || key === 'U+004F') {
 		document.getElementById("overlayCanvasLink").click();
+	} else if (event.shiftKey) {
+		if (key === 'ArrowLeft' || key === 'Left')
+			rotatePhoto(270);
+		else if (key === 'ArrowRight' || key === 'Right')
+			rotatePhoto(90);
+		else if (key === 'ArrowDown' || key === 'Down')
+			rotatePhoto(180);
+		else if (key === 'ArrowUp' || key === 'Up')
+			rotatePhoto(180);
+		else
+			return true;
+		if (document.getElementById("canvas").style.display === 'block')
+			drawCanvas();
 	} else
 		return true;
 
