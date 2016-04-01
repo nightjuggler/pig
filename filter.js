@@ -254,31 +254,67 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 {
 	var info = {
 		radius: Polar.Radii[value],
+		reverse: reverse ? true : false,
 		width: divWidth,
 		height: divHeight,
 	};
 
-	if (reverse)
-		info.reverse = true;
-
 	createPolarDisplacementMap(info);
 
-	var fe1 = document.createElementNS(svgNS, 'feImage');
-	fe1.setAttributeNS(xlinkNS, 'href', info.url);
-	fe1.setAttribute('x', 0);
-	fe1.setAttribute('y', 0);
-	fe1.setAttribute('width', info.width);
-	fe1.setAttribute('height', info.height);
-	fe1.setAttribute('result', 'map');
+	var fe, feList = [];
 
-	var fe2 = document.createElementNS(svgNS, 'feDisplacementMap');
-	fe2.setAttribute('in', 'SourceGraphic');
-	fe2.setAttribute('in2', 'map');
-	fe2.setAttribute('scale', info.scale);
-	fe2.setAttribute('xChannelSelector', 'R');
-	fe2.setAttribute('yChannelSelector', 'G');
+	fe = document.createElementNS(svgNS, 'feImage');
+	fe.setAttributeNS(xlinkNS, 'href', info.url1);
+	fe.setAttribute('x', 0);
+	fe.setAttribute('y', 0);
+	fe.setAttribute('width', info.width);
+	fe.setAttribute('height', info.height);
+	fe.setAttribute('result', 'map1');
+	feList.push(fe);
 
-	return createFilter(channels, fe1, fe2);
+	fe = document.createElementNS(svgNS, 'feDisplacementMap');
+	fe.setAttribute('in', 'SourceGraphic');
+	fe.setAttribute('in2', 'map1');
+	fe.setAttribute('scale', info.scale1);
+	fe.setAttribute('xChannelSelector', 'R');
+	fe.setAttribute('yChannelSelector', 'G');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in2', 'map1');
+	fe.setAttribute('result', 'r1');
+	fe.setAttribute('operator', 'in');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feImage');
+	fe.setAttributeNS(xlinkNS, 'href', info.url2);
+	fe.setAttribute('x', 0);
+	fe.setAttribute('y', 0);
+	fe.setAttribute('width', info.width);
+	fe.setAttribute('height', info.height);
+	fe.setAttribute('result', 'map2');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feDisplacementMap');
+	fe.setAttribute('in', 'SourceGraphic');
+	fe.setAttribute('in2', 'map2');
+	fe.setAttribute('scale', info.scale2);
+	fe.setAttribute('xChannelSelector', 'R');
+	fe.setAttribute('yChannelSelector', 'G');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in2', 'map2');
+	fe.setAttribute('result', 'r2');
+	fe.setAttribute('operator', 'in');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in', 'r1');
+	fe.setAttribute('in2', 'r2');
+	feList.push(fe);
+
+	return createFilter(channels, feList);
 }
 function createSVGReversePolar(value, channels, edgeMode)
 {
@@ -702,8 +738,11 @@ function createPolarDisplacementMap(info)
 {
 	var width = info.width;
 	var height = info.height;
-	info.scale = 2 * Math.max(width, height);
-	var scale = info.scale;
+	info.scale1 = 2 * Math.max(width, height);
+	info.scale2 = info.scale1 / 3;
+	var scale1 = info.scale1;
+	var scale2 = info.scale2;
+	var halfScale2 = scale2 / 2;
 
 	var reverse = (typeof info.reverse === 'boolean') ? info.reverse : false;
 	var radius = ((typeof info.radius === 'function') ? info.radius : Polar.RadiusHalfDiagonal)(width, height);
@@ -714,8 +753,12 @@ function createPolarDisplacementMap(info)
 	var angleScale = (maxAngle - minAngle) / (width - 1);
 
 	var cacheKey = [width, height, radius, reverse].join('_');
-	info.url = polarMapCache[cacheKey];
-	if (info.url) return;
+	var cachedInfo = polarMapCache[cacheKey];
+	if (cachedInfo) {
+		info.url1 = cachedInfo.url1;
+		info.url2 = cachedInfo.url2;
+		return;
+	}
 
 	if (hiddenCanvas === undefined)
 		hiddenCanvas = document.createElement("canvas");
@@ -724,13 +767,16 @@ function createPolarDisplacementMap(info)
 	hiddenCanvas.height = height;
 
 	var context = hiddenCanvas.getContext("2d");
-	var mapData = context.createImageData(width, height);
-	var d = mapData.data;
+	var map1 = context.createImageData(width, height);
+	var map2 = context.createImageData(width, height);
+	var map1Data = map1.data;
+	var map2Data = map2.data;
 
 	var centerX = Math.round(width / 2);
 	var centerY = Math.round(height / 2);
 
 	var x, y, hypot, angle;
+	var scale, d, d2, di = 0;
 
 	for (var j = 0; j < height; ++j)
 		for (var i = 0; i < width; ++i)
@@ -764,23 +810,42 @@ function createPolarDisplacementMap(info)
 				edge = true; y = height - 1;
 			}
 
-			var di = (j * width + i) * 4;
+			if (Math.abs(x - i) < halfScale2 && Math.abs(y - j) < halfScale2) {
+				d = map2Data;
+				d2 = map1Data;
+				scale = scale2;
+			} else {
+				d = map1Data;
+				d2 = map2Data;
+				scale = scale1;
+			}
 
 			d[di  ] = 255 * ((x - i)/scale + 0.5);
 			d[di+1] = 255 * ((y - j)/scale + 0.5);
 			d[di+2] = 0;
 			d[di+3] = 255;
 
+			d2[di  ] = 128;
+			d2[di+1] = 128;
+			d2[di+2] = 0;
+			d2[di+3] = 0;
+
 			x = i + scale * (d[di  ]/255 - 0.5);
 			y = j + scale * (d[di+1]/255 - 0.5);
 
 			if (x < 0) d[di  ] += 1; else if (x >= width)  d[di  ] -= 1;
 			if (y < 0) d[di+1] += 1; else if (y >= height) d[di+1] -= 1;
+
+			di += 4;
 		}
 
-	context.putImageData(mapData, 0, 0);
+	context.putImageData(map1, 0, 0);
+	info.url1 = hiddenCanvas.toDataURL("image/png");
 
-	polarMapCache[cacheKey] = info.url = hiddenCanvas.toDataURL("image/png");
+	context.putImageData(map2, 0, 0);
+	info.url2 = hiddenCanvas.toDataURL("image/png");
+
+	polarMapCache[cacheKey] = info;
 }
 function polarTransform(context, inData, channels, info)
 {
