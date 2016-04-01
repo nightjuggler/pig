@@ -830,8 +830,8 @@ function createPolarDisplacementMap(info)
 			d2[di+2] = 0;
 			d2[di+3] = 0;
 
-			x = i + scale * (d[di  ]/255 - 0.5);
-			y = j + scale * (d[di+1]/255 - 0.5);
+			x = Math.round(i + scale * (d[di  ]/255 - 0.5));
+			y = Math.round(j + scale * (d[di+1]/255 - 0.5));
 
 			if (x < 0) d[di  ] += 1; else if (x >= width)  d[di  ] -= 1;
 			if (y < 0) d[di+1] += 1; else if (y >= height) d[di+1] -= 1;

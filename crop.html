@@ -658,7 +658,6 @@ function init()
 	cropInverseAspectRatio = false;
 
 	setDisplayArea();
-	disableCropElements(false);
 	setInverseAspectRatioAbility();
 
 	cropWidthField = document.getElementById("cropWidthField");
@@ -955,13 +954,11 @@ function setInverseAspectRatioAbility()
 {
 	var checkbox = document.getElementById("inverseAspectRatioCheckbox");
 
-	if (originalWidth > originalHeight) {
-		if (divWidth > originalHeight)
-			checkbox.disabled = true;
-	} else {
-		if (divHeight > originalWidth)
-			checkbox.disabled = true;
-	}
+	if (originalWidth > originalHeight)
+		checkbox.disabled = (divWidth > originalHeight);
+	else
+		checkbox.disabled = (divHeight > originalWidth);
+
 	if (checkbox.disabled)
 		checkbox.checked = false;
 }
@@ -1076,6 +1073,8 @@ function hideFailed()
 function imageLoaded(event)
 {
 	if (cropped) undo();
+	else if (photo.src === "")
+		disableCropElements(false);
 
 	var imageObject = event.target;
 	photo.src = imageObject.src;
