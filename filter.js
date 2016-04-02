@@ -6,6 +6,8 @@ var channelMap = [['R', 1], ['G', 2], ['B', 4]];
 var divWidth, divHeight;
 var photoLeft, photoTop;
 var userSpaceFilters = [];
+var filterMarginX;
+var filterMarginY;
 
 function removeSVGFilter(id)
 {
@@ -16,28 +18,77 @@ function removeSVGFilter(id)
 	svgFilterIdBin.push(id);
 
 	for (var i = 0, len = userSpaceFilters.length; i < len; ++i)
-		if (userSpaceFilters[i].id === idStr) {
+		if (userSpaceFilters[i][0][0].id === idStr) {
 			userSpaceFilters.splice(i, 1);
 			break;
 		}
 }
-function setUserSpaceOnUse(id)
+function setUserSpaceElement(f)
+{
+	if (filterMarginX === undefined) return;
+
+	var x = Math.round(-photoLeft);
+	var y = Math.round(-photoTop);
+
+	var xValues = [x, x - filterMarginX, x + divWidth - 1];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+
+	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
+	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
+
+	var [fe, x, y, w, h] = f;
+
+	if (x >= 0) fe.setAttribute('x', xValues[x]);
+	if (y >= 0) fe.setAttribute('y', yValues[y]);
+	if (w >= 0) fe.setAttribute('width', widths[w]);
+	if (h >= 0) fe.setAttribute('height', heights[h]);
+}
+function addUserSpaceFilter(id, i, feList)
 {
 	var fe = document.getElementById('filter' + id);
 	fe.setAttribute('filterUnits', 'userSpaceOnUse');
-	fe.setAttribute('x', Math.round(-photoLeft));
-	fe.setAttribute('y', Math.round(-photoTop));
-	fe.setAttribute('width', divWidth);
-	fe.setAttribute('height', divHeight);
-	userSpaceFilters.push(fe);
+	var f = [fe, i, i, i, i];
+	feList.unshift(f);
+	setUserSpaceElement(f);
+	userSpaceFilters.push(feList);
 }
 function updateUserSpaceFilters()
 {
-	for (var fe of userSpaceFilters)
-	{
-		fe.setAttribute('x', Math.round(-photoLeft));
-		fe.setAttribute('y', Math.round(-photoTop));
-	}
+	var x = Math.round(-photoLeft);
+	var y = Math.round(-photoTop);
+
+	var xValues = [x, x - filterMarginX, x + divWidth - 1];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+
+	for (var f of userSpaceFilters)
+		for (var [fe, x, y, w, h] of f)
+		{
+			if (x >= 0) fe.setAttribute('x', xValues[x]);
+			if (y >= 0) fe.setAttribute('y', yValues[y]);
+		}
+}
+function resetUserSpaceFilters()
+{
+	var x = Math.round(-photoLeft);
+	var y = Math.round(-photoTop);
+
+	filterMarginX = Math.round(divWidth / 10);
+	filterMarginY = Math.round(divHeight / 10);
+
+	var xValues = [x, x - filterMarginX, x + divWidth - 1];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+
+	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
+	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
+
+	for (var f of userSpaceFilters)
+		for (var [fe, x, y, w, h] of f)
+		{
+			if (x >= 0) fe.setAttribute('x', xValues[x]);
+			if (y >= 0) fe.setAttribute('y', yValues[y]);
+			if (w >= 0) fe.setAttribute('width', widths[w]);
+			if (h >= 0) fe.setAttribute('height', heights[h]);
+		}
 }
 function createChannelMask(channels, unfiltered)
 {
@@ -333,47 +384,53 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	feList.push(fe);
 
 	var id = createFilter(channels, feList);
-	setUserSpaceOnUse(id);
+	addUserSpaceFilter(id, 0, []);
 	return id;
 }
 function createSVGReversePolar(value, channels, edgeMode)
 {
 	return createSVGPolar(value, channels, edgeMode, true);
 }
-function dup(feList, mergeList, result, x, y, width, height, tileAttr, tilePct)
+function dup(feList, mergeList, userSpace, result, f1, f2)
 {
 	var fe;
+	var [x, y, w, h] = f1;
 
 	fe = document.createElementNS(svgNS, 'feOffset');
 	fe.setAttribute('in', 'SourceGraphic');
-	fe.setAttribute('x', x);
-	fe.setAttribute('y', y);
-	fe.setAttribute('width', width);
-	fe.setAttribute('height', height);
+	if (w < 0) fe.setAttribute('width', 1);
+	if (h < 0) fe.setAttribute('height', 1);
 	feList.push(fe);
+
+	f1.unshift(fe);
+	setUserSpaceElement(f1);
+	userSpace.push(f1);
 
 	fe = document.createElementNS(svgNS, 'feTile');
 	fe.setAttribute('result', result);
-	fe.setAttribute(tileAttr, tilePct);
 	feList.push(fe);
+
+	f2.unshift(fe);
+	setUserSpaceElement(f2);
+	userSpace.push(f2);
 
 	mergeList.push(result);
 }
-function dupTop(feList, mergeList)
+function dupTop(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, 'dupTop', 0, 0, '100%', 1, 'height', '20%');
+	dup(feList, mergeList, userSpace, 'dupTop', [0, 0, 0, -1], [-1, -1, -1, 2]);
 }
-function dupBottom(feList, mergeList, maxY)
+function dupBottom(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, 'dupBottom', 0, maxY, '100%', 1, 'y', '90%');
+	dup(feList, mergeList, userSpace, 'dupBottom', [0, 2, 0, -1], [-1, 2, -1, -1]);
 }
-function dupLeft(feList, mergeList)
+function dupLeft(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, 'dupLeft', 0, 0, 1, '100%', 'width', '20%');
+	dup(feList, mergeList, userSpace, 'dupLeft', [0, 0, -1, 0], [-1, -1, 2, -1]);
 }
-function dupRight(feList, mergeList, maxX)
+function dupRight(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, 'dupRight', maxX, 0, 1, '100%', 'x', '90%');
+	dup(feList, mergeList, userSpace, 'dupRight', [2, 0, -1, 0], [2, -1, -1, -1]);
 }
 function createMerge(mergeList)
 {
@@ -410,39 +467,34 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 		order = '1 ' + (radius + 1);
 	}
 
-	var kernel = [1];
-	for (var i = 0; i < radius; ++i) kernel.push(1);
-	kernel = kernel.join(' ');
+	var fe, feList = [], userSpaceElements = [];
 
-	var fe, feList = [];
 	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
 	{
 		var mergeList = [];
-		if (isX) {
-			if (isLeft)
-				dupLeft(feList, mergeList);
-			else
-				dupRight(feList, mergeList, divWidth - 1);
-		} else {
-			if (isLeft)
-				dupTop(feList, mergeList);
-			else
-				dupBottom(feList, mergeList, divHeight - 1);
-		}
+
+		(isX ? (isLeft ? dupLeft : dupRight)
+			: (isLeft ? dupTop : dupBottom))(feList, mergeList, userSpaceElements);
+
 		feList.push(createMerge(mergeList));
 	}
 	else if (edgeMode === 'wrap')
 	{
 		fe = document.createElementNS(svgNS, 'feOffset');
-		fe.setAttribute('x', 0);
-		fe.setAttribute('y', 0);
-		fe.setAttribute('width', '100%');
-		fe.setAttribute('height', '100%');
 		feList.push(fe);
+
+		fe = [fe, 0, 0, 0, 0];
+		setUserSpaceElement(fe);
+		userSpaceElements.push(fe);
 
 		fe = document.createElementNS(svgNS, 'feTile');
 		feList.push(fe);
 	}
+
+	var kernel = [1];
+	for (var i = 0; i < radius; ++i) kernel.push(1);
+	kernel = kernel.join(' ');
+
 	for (var i = 0; i < 3; ++i)
 	{
 		fe = document.createElementNS(svgNS, 'feConvolveMatrix');
@@ -454,7 +506,11 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 			fe.setAttribute('edgeMode', edgeMode);
 		feList.push(fe);
 	}
-	return createFilter(channels, feList);
+
+	var id = createFilter(channels, feList);
+	if (userSpaceElements.length > 0)
+		addUserSpaceFilter(id, 1, userSpaceElements);
+	return id;
 }
 function createSVGDBlurX(radius, channels, edgeMode)
 {
@@ -466,29 +522,29 @@ function createSVGDBlurY(radius, channels, edgeMode)
 }
 function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 {
-	var fe, feList = [];
+	var fe, feList = [], userSpaceElements = [];
 
 	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
 	{
 		var mergeList = [];
 		if (xRadius > 0) {
-			dupLeft(feList, mergeList);
-			dupRight(feList, mergeList, divWidth - 1);
+			dupLeft(feList, mergeList, userSpaceElements);
+			dupRight(feList, mergeList, userSpaceElements);
 		}
 		if (yRadius > 0) {
-			dupTop(feList, mergeList);
-			dupBottom(feList, mergeList, divHeight - 1);
+			dupTop(feList, mergeList, userSpaceElements);
+			dupBottom(feList, mergeList, userSpaceElements);
 		}
 		feList.push(createMerge(mergeList));
 	}
 	else if (edgeMode === 'wrap')
 	{
 		fe = document.createElementNS(svgNS, 'feOffset');
-		fe.setAttribute('x', 0);
-		fe.setAttribute('y', 0);
-		fe.setAttribute('width', '100%');
-		fe.setAttribute('height', '100%');
 		feList.push(fe);
+
+		fe = [fe, 0, 0, 0, 0];
+		setUserSpaceElement(fe);
+		userSpaceElements.push(fe);
 
 		fe = document.createElementNS(svgNS, 'feTile');
 		feList.push(fe);
@@ -500,7 +556,10 @@ function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 		fe.setAttribute('edgeMode', edgeMode);
 	feList.push(fe);
 
-	return createFilter(channels, feList);
+	var id = createFilter(channels, feList);
+	if (userSpaceElements.length > 0)
+		addUserSpaceFilter(id, 1, userSpaceElements);
+	return id;
 }
 function createBlurXFilter(xRadius, channels, edgeMode)
 {
