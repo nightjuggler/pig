@@ -310,8 +310,7 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	feList.push(fe);
 
 	fe = document.createElementNS(svgNS, 'feComposite');
-	fe.setAttribute('in', 'r1');
-	fe.setAttribute('in2', 'r2');
+	fe.setAttribute('in2', 'r1');
 	feList.push(fe);
 
 	return createFilter(channels, feList);
@@ -320,25 +319,179 @@ function createSVGReversePolar(value, channels, edgeMode)
 {
 	return createSVGPolar(value, channels, edgeMode, true);
 }
-function createGaussianBlur(xRadius, yRadius, edgeMode)
+function dup(feList, mergeList, result, x, y, width, height, tileAttr, tilePct)
 {
-	var fe = document.createElementNS(svgNS, 'feGaussianBlur');
+	var fe;
+
+	fe = document.createElementNS(svgNS, 'feOffset');
+	fe.setAttribute('in', 'SourceGraphic');
+	fe.setAttribute('x', x);
+	fe.setAttribute('y', y);
+	fe.setAttribute('width', width);
+	fe.setAttribute('height', height);
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feTile');
+	fe.setAttribute('result', result);
+	fe.setAttribute(tileAttr, tilePct);
+	feList.push(fe);
+
+	mergeList.push(result);
+}
+function dupTop(feList, mergeList)
+{
+	dup(feList, mergeList, 'dupTop', 0, 0, '100%', 1, 'height', '20%');
+}
+function dupBottom(feList, mergeList, maxY)
+{
+	dup(feList, mergeList, 'dupBottom', 0, maxY, '100%', 1, 'y', '90%');
+}
+function dupLeft(feList, mergeList)
+{
+	dup(feList, mergeList, 'dupLeft', 0, 0, 1, '100%', 'width', '20%');
+}
+function dupRight(feList, mergeList, maxX)
+{
+	dup(feList, mergeList, 'dupRight', maxX, 0, 1, '100%', 'x', '90%');
+}
+function createMerge(mergeList)
+{
+	var feMerge = document.createElementNS(svgNS, 'feMerge');
+
+	mergeList.push('SourceGraphic');
+
+	for (var inName of mergeList)
+	{
+		var feMergeNode = document.createElementNS(svgNS, 'feMergeNode');
+		feMergeNode.setAttribute('in', inName);
+		feMerge.appendChild(feMergeNode);
+	}
+
+	return feMerge;
+}
+function createSVGDBlur(radius, channels, edgeMode, isX)
+{
+	var isLeft, targetAttribute, targetValue, order;
+
+	if (radius < 0) {
+		isLeft = true;
+		radius = -radius;
+		targetValue = radius;
+	} else {
+		isLeft = false;
+		targetValue = 0;
+	}
+	if (isX) {
+		targetAttribute = 'targetX';
+		order = (radius + 1) + ' 1';
+	} else {
+		targetAttribute = 'targetY';
+		order = '1 ' + (radius + 1);
+	}
+
+	var kernel = [1];
+	for (var i = 0; i < radius; ++i) kernel.push(1);
+	kernel = kernel.join(' ');
+
+	var fe, feList = [];
+	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
+	{
+		var mergeList = [];
+		if (isX) {
+			if (isLeft)
+				dupLeft(feList, mergeList);
+			else
+				dupRight(feList, mergeList, divWidth - 1);
+		} else {
+			if (isLeft)
+				dupTop(feList, mergeList);
+			else
+				dupBottom(feList, mergeList, divHeight - 1);
+		}
+		feList.push(createMerge(mergeList));
+	}
+	else if (edgeMode === 'wrap')
+	{
+		fe = document.createElementNS(svgNS, 'feOffset');
+		fe.setAttribute('x', 0);
+		fe.setAttribute('y', 0);
+		fe.setAttribute('width', '100%');
+		fe.setAttribute('height', '100%');
+		feList.push(fe);
+
+		fe = document.createElementNS(svgNS, 'feTile');
+		feList.push(fe);
+	}
+	for (var i = 0; i < 3; ++i)
+	{
+		fe = document.createElementNS(svgNS, 'feConvolveMatrix');
+		fe.setAttribute('preserveAlpha', 'true');
+		fe.setAttribute('order', order);
+		fe.setAttribute('kernelMatrix', kernel);
+		fe.setAttribute(targetAttribute, targetValue);
+		if (edgeMode === 'duplicate' || edgeMode === 'wrap' || edgeMode === 'none')
+			fe.setAttribute('edgeMode', edgeMode);
+		feList.push(fe);
+	}
+	return createFilter(channels, feList);
+}
+function createSVGDBlurX(radius, channels, edgeMode)
+{
+	return createSVGDBlur(radius, channels, edgeMode, true);
+}
+function createSVGDBlurY(radius, channels, edgeMode)
+{
+	return createSVGDBlur(radius, channels, edgeMode, false);
+}
+function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
+{
+	var fe, feList = [];
+
+	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
+	{
+		var mergeList = [];
+		if (xRadius > 0) {
+			dupLeft(feList, mergeList);
+			dupRight(feList, mergeList, divWidth - 1);
+		}
+		if (yRadius > 0) {
+			dupTop(feList, mergeList);
+			dupBottom(feList, mergeList, divHeight - 1);
+		}
+		feList.push(createMerge(mergeList));
+	}
+	else if (edgeMode === 'wrap')
+	{
+		fe = document.createElementNS(svgNS, 'feOffset');
+		fe.setAttribute('x', 0);
+		fe.setAttribute('y', 0);
+		fe.setAttribute('width', '100%');
+		fe.setAttribute('height', '100%');
+		feList.push(fe);
+
+		fe = document.createElementNS(svgNS, 'feTile');
+		feList.push(fe);
+	}
+
+	fe = document.createElementNS(svgNS, 'feGaussianBlur');
 	fe.setAttribute('stdDeviation', xRadius + ' ' + yRadius);
 	if (edgeMode === 'duplicate' || edgeMode === 'wrap' || edgeMode === 'none')
 		fe.setAttribute('edgeMode', edgeMode);
-	return fe;
+	feList.push(fe);
+
+	return createFilter(channels, feList);
 }
 function createBlurXFilter(xRadius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(xRadius, 0, edgeMode));
+	return createGaussianBlur(xRadius, 0, channels, edgeMode);
 }
 function createBlurYFilter(yRadius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(0, yRadius, edgeMode));
+	return createGaussianBlur(0, yRadius, channels, edgeMode);
 }
 function createBlurFilter(radius, channels, edgeMode)
 {
-	return createFilter(channels, createGaussianBlur(radius, radius, edgeMode));
+	return createGaussianBlur(radius, radius, channels, edgeMode);
 }
 function svgCannotImplement(amount, channels)
 {
@@ -732,7 +885,6 @@ function setChannelFlags(info, channels)
 		info.setA = true;
 	}
 }
-var hiddenCanvas;
 var polarMapCache = {};
 function createPolarDisplacementMap(info)
 {
@@ -760,9 +912,7 @@ function createPolarDisplacementMap(info)
 		return;
 	}
 
-	if (hiddenCanvas === undefined)
-		hiddenCanvas = document.createElement("canvas");
-
+	var hiddenCanvas = document.createElement("canvas");
 	hiddenCanvas.width = width;
 	hiddenCanvas.height = height;
 

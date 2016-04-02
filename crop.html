@@ -1471,15 +1471,18 @@ var polarUI = {
 		radiusSelect.add(new Option('width/2', '1'));
 		radiusSelect.add(new Option('height/2', '2'));
 		radiusSelect.add(new Option('height', '3'));
-		radiusSelect.addEventListener('change',
-			function(event) {filter.value = radiusSelect.selectedIndex;}, false);
+		radiusSelect.addEventListener('change', function(event) {
+			filter.value = radiusSelect.selectedIndex;
+			manageFilters(filter);
+		}, false);
 
 		var edgeSelect = document.createElement('SELECT');
 		edgeSelect.add(new Option('duplicate', '0', true, true));
 		edgeSelect.add(new Option('black', '1'));
 		edgeSelect.add(new Option('transparent', '2'));
-		edgeSelect.addEventListener('change',
-			function(event) {filter.edgeMode = edgeSelect.selectedIndex;}, false);
+		edgeSelect.addEventListener('change', function(event) {
+			filter.edgeMode = edgeSelect.selectedIndex;
+		}, false);
 
 		var div = filter.uiDiv;
 		div.appendChild(document.createTextNode('Radius:'));
@@ -1685,8 +1688,8 @@ new FilterOption('convolve',   '',      0, 0,   12, applyConvolution,           
 new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     false, createBlurFilter),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
-new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                         true,  svgCannotImplement),
-new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  svgCannotImplement),
+new FilterOption('d-blur-x',   'px',    0,-100,100, applyDBlurX,                         true,  createSVGDBlurX),
+new FilterOption('d-blur-y',   'px',    0,-100,100, applyDBlurY,                         true,  createSVGDBlurY),
 new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  svgCannotImplement),
 new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  svgCannotImplement),
 ];
