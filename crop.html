@@ -448,6 +448,7 @@ function photoDrag(event)
 		cropYField.value = -x2;
 	}
 
+	updateUserSpaceFilters();
 	return false;
 }
 function startPhotoDrag(event)
@@ -803,6 +804,7 @@ function setSpecParam()
 		+ document.getElementById("fileNameField").value + "', '"
 		+ cropWidth + "x" + cropHeight + "+"
 		+ cropXField.value + "+" + cropYField.value + "')";
+	updateUserSpaceFilters();
 }
 function crop()
 {
@@ -847,6 +849,7 @@ function undo()
 
 	transformPhoto();
 	setCropperXY();
+	updateUserSpaceFilters();
 
 	photo.onmousedown = preventDefault;
 	photo.style.cursor = 'default';
@@ -1111,6 +1114,10 @@ function imageLoaded(event)
 	if (queryString.overlayCanvas) {
 		queryString.overlayCanvas = false;
 		document.getElementById("overlayCanvasLink").click();
+	}
+	if (queryString.experimentalMode) {
+		queryString.experimentalMode = false;
+		updatePolarFilters();
 	}
 }
 function imageFailedLoad(event)
@@ -2265,6 +2272,7 @@ function parseQueryString()
 		cropGeometry: null,
 		rotateAngle: 0,
 		inverseAspectRatio: false,
+		experimentalMode: false,
 	};
 
 	var q = window.location.search;
@@ -2279,6 +2287,10 @@ function parseQueryString()
 		}
 		if (s === 'iar') {
 			queryString.inverseAspectRatio = true;
+			continue;
+		}
+		if (s === 'x') {
+			queryString.experimentalMode = true;
 			continue;
 		}
 		var i = s.indexOf('=');
@@ -2480,10 +2492,6 @@ function copyCropGeometry(event)
 }
 function updatePolarFilters()
 {
-	if (cropped) return;
-	var cropButton = document.getElementById('cropButton');
-	var undoButton = document.getElementById('undoButton');
-
 	var polarIndex = filterIndex['polar'];
 	var depolarIndex = filterIndex['depolar'];
 	var polar = filterOptions[polarIndex];
@@ -2492,14 +2500,10 @@ function updatePolarFilters()
 	var nameSuffix;
 
 	if (polar.createSVGFilter === svgCannotImplement) {
-		cropButton.disabled = true;
-		undoButton.disabled = true;
 		polar.createSVGFilter = createSVGPolar;
 		depolar.createSVGFilter = createSVGReversePolar;
 		nameSuffix = '';
 	} else {
-		cropButton.disabled = false;
-		undoButton.disabled = false;
 		polar.createSVGFilter = svgCannotImplement;
 		depolar.createSVGFilter = svgCannotImplement;
 		nameSuffix = ' *';

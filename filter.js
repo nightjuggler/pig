@@ -3,13 +3,41 @@ var xlinkNS = 'http://www.w3.org/1999/xlink';
 var svgFilterId = 0;
 var svgFilterIdBin = [];
 var channelMap = [['R', 1], ['G', 2], ['B', 4]];
+var divWidth, divHeight;
+var photoLeft, photoTop;
+var userSpaceFilters = [];
 
 function removeSVGFilter(id)
 {
 	if (id <= 0) return;
-	var filterElement = document.getElementById('filter' + id);
+	var idStr = 'filter' + id;
+	var filterElement = document.getElementById(idStr);
 	filterElement.parentNode.removeChild(filterElement);
 	svgFilterIdBin.push(id);
+
+	for (var i = 0, len = userSpaceFilters.length; i < len; ++i)
+		if (userSpaceFilters[i].id === idStr) {
+			userSpaceFilters.splice(i, 1);
+			break;
+		}
+}
+function setUserSpaceOnUse(id)
+{
+	var fe = document.getElementById('filter' + id);
+	fe.setAttribute('filterUnits', 'userSpaceOnUse');
+	fe.setAttribute('x', Math.round(-photoLeft));
+	fe.setAttribute('y', Math.round(-photoTop));
+	fe.setAttribute('width', divWidth);
+	fe.setAttribute('height', divHeight);
+	userSpaceFilters.push(fe);
+}
+function updateUserSpaceFilters()
+{
+	for (var fe of userSpaceFilters)
+	{
+		fe.setAttribute('x', Math.round(-photoLeft));
+		fe.setAttribute('y', Math.round(-photoTop));
+	}
 }
 function createChannelMask(channels, unfiltered)
 {
@@ -249,7 +277,6 @@ function createSVGConvolve(value, channels, abs)
 
 	return createFilter(channels, createConvolveElement(convolution, '3 3'));
 }
-var divWidth, divHeight;
 function createSVGPolar(value, channels, edgeMode, reverse)
 {
 	var info = {
@@ -265,10 +292,6 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 
 	fe = document.createElementNS(svgNS, 'feImage');
 	fe.setAttributeNS(xlinkNS, 'href', info.url1);
-	fe.setAttribute('x', 0);
-	fe.setAttribute('y', 0);
-	fe.setAttribute('width', info.width);
-	fe.setAttribute('height', info.height);
 	fe.setAttribute('result', 'map1');
 	feList.push(fe);
 
@@ -288,10 +311,6 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 
 	fe = document.createElementNS(svgNS, 'feImage');
 	fe.setAttributeNS(xlinkNS, 'href', info.url2);
-	fe.setAttribute('x', 0);
-	fe.setAttribute('y', 0);
-	fe.setAttribute('width', info.width);
-	fe.setAttribute('height', info.height);
 	fe.setAttribute('result', 'map2');
 	feList.push(fe);
 
@@ -313,7 +332,9 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	fe.setAttribute('in2', 'r1');
 	feList.push(fe);
 
-	return createFilter(channels, feList);
+	var id = createFilter(channels, feList);
+	setUserSpaceOnUse(id);
+	return id;
 }
 function createSVGReversePolar(value, channels, edgeMode)
 {
