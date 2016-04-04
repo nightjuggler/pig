@@ -84,6 +84,21 @@ code {
 .cT { color: rgb(0,100,0); } /* DarkGreen */
 .cA { color: rgb(128,0,128); } /* Purple */
 .cV { color: rgb(0,0,128); } /* Navy */
+#aboutLink, #overlayCanvasLink {
+	background-color: rgb(245,222,179); /* Wheat */
+	border-radius: 6px;
+	padding: 4px;
+}
+#aboutDiv {
+	background-color: rgb(230,230,250); /* Lavender */
+	border: 2px solid black;
+	border-radius: 10px;
+	box-shadow: inset 0 0 10px 0 rgba(0,0,0,.5);
+	display: none;
+	padding: 6px 10px 4px 10px; /* top right bottom left */
+	position: absolute;
+	width: 600px;
+}
 #controlDiv {
 	background-color: rgba(230,230,250,0.8);
 	border: 2px solid black;
@@ -804,7 +819,7 @@ function setSpecParam()
 		+ document.getElementById("fileNameField").value + "', '"
 		+ cropWidth + "x" + cropHeight + "+"
 		+ cropXField.value + "+" + cropYField.value + "')";
-	updateUserSpaceFilters();
+	resetUserSpaceFilters();
 }
 function crop()
 {
@@ -849,7 +864,7 @@ function undo()
 
 	transformPhoto();
 	setCropperXY();
-	updateUserSpaceFilters();
+	resetUserSpaceFilters();
 
 	photo.onmousedown = preventDefault;
 	photo.style.cursor = 'default';
@@ -1693,7 +1708,7 @@ new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateF
 new FilterOption('threshold',  '',    128, 0,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
 new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
 new FilterOption('convolve',   '',      0, 0,   12, applyConvolution,                    true,  createSVGConvolve),
-new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     false, createBlurFilter),
+new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     true,  createBlurFilter),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
 new FilterOption('d-blur-x',   'px',    0,-40,  40, applyDBlurX,                         true,  createSVGDBlurX),
@@ -2393,19 +2408,15 @@ function createFilterDiv()
 		table.appendChild(tableRow);
 	}
 
-	var overlayCanvasLink = document.getElementById('overlayCanvasLink');
 	var link = document.createElement('A');
 	link.href = '#';
-	link.appendChild(document.createTextNode('Overlay Canvas'));
-	link.addEventListener('click', function(event)
-		{event.preventDefault(); overlayCanvasLink.click();}, false);
+	link.appendChild(document.createTextNode('About'));
+	link.addEventListener('click', showAbout, false);
 
 	var note = document.createElement('DIV');
-	note.appendChild(document.createTextNode('Filters marked by an asterisk (*) are not implemented in SVG.'));
-	note.appendChild(document.createElement('BR'));
-	note.appendChild(document.createTextNode('Click '));
+	note.appendChild(document.createTextNode('The SVG filters for polar and depolar are disabled. See '));
 	note.appendChild(link);
-	note.appendChild(document.createTextNode(' to see the effect of these filters.'));
+	note.appendChild(document.createTextNode('.'));
 
 	var filterDiv = document.getElementById('filterDiv');
 	filterDiv.appendChild(table);
@@ -2497,14 +2508,17 @@ function updatePolarFilters()
 	var depolarIndex = filterIndex['depolar'];
 	var polar = filterOptions[polarIndex];
 	var depolar = filterOptions[depolarIndex];
+	var filterNote = document.getElementById('filterDiv').lastChild;
 	var updateFilters = false;
 	var nameSuffix;
 
 	if (polar.createSVGFilter === svgCannotImplement) {
+		filterNote.style.display = 'none';
 		polar.createSVGFilter = createSVGPolar;
 		depolar.createSVGFilter = createSVGReversePolar;
 		nameSuffix = '';
 	} else {
+		filterNote.style.display = 'block';
 		polar.createSVGFilter = svgCannotImplement;
 		depolar.createSVGFilter = svgCannotImplement;
 		nameSuffix = ' *';
@@ -2555,6 +2569,17 @@ function documentKeyDown(event)
 	event.preventDefault();
 	event.stopPropagation();
 	return false;
+}
+function showAbout(event)
+{
+	event.preventDefault();
+	var aboutDiv = document.getElementById("aboutDiv");
+	aboutDiv.style.display = "block";
+	centerElement(aboutDiv);
+}
+function hideAbout()
+{
+	document.getElementById("aboutDiv").style.display = "none";
 }
 function disableCropElements(disable)
 {
@@ -2612,6 +2637,7 @@ function bodyLoaded()
 	document.getElementById("copySVG").addEventListener("click", copySVG, false);
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	document.getElementById("copyCropGeometry").addEventListener("click", copyCropGeometry, false);
+	document.getElementById("aboutLink").addEventListener("click", showAbout, false);
 	document.getElementById("overlayCanvasLink").addEventListener("click", overlayCanvas, false);
 	document.addEventListener("keydown", documentKeyDown, false);
 	loadImage();
@@ -2627,6 +2653,7 @@ function bodyLoaded()
 <div id="resizeSW"></div>
 <div id="resizeSE"></div>
 </div>
+<a href="#" id="aboutLink">About</a>
 <a href="#" id="overlayCanvasLink">Overlay Canvas</a>
 
 <div id="filterCodeDiv">
@@ -2743,9 +2770,31 @@ Crop Inverse Aspect Ratio
 </table>
 <input type="button" value="Close" onclick="convolveUI.hideInfo()" />
 </div>
+<div id="aboutDiv">
+This works best in Firefox. At the time of writing, I'm using Firefox 45, Chrome 49, and Safari 9.1.
+<br>
+<br>'Overlay Canvas' and 'Save' only work if the image you're viewing is either served from the same origin (domain) as this page or if the image was selected via 'Browse Files'.
+<br>
+<br>The SVG filters for polar and depolar are disabled by default because they only work well in Firefox. You can enable them by pressing 'x'. Pressing 'x' again disables them. You can also enable them by including 'x' in the query string of the URL, either immediately after the question mark or immediately after an ampersand. For example:
+<br>
+<br><a href="https://nightjuggler.com/pie/?f=polar&amp;x">https://nightjuggler.com/pie/?f=polar&amp;x</a>
+<br>
+<br>In Chrome, the SVG implementations for polar and depolar seem to work as long as you don't precede them with other filters.
+<br>
+<br>In Safari, the SVG implementations for polar and depolar don't work at all because Safari doesn't seem to allow the use of &lt;feImage&gt; in a filter that's applied to an HTML element like &lt;img&gt;. Safari also often doesn't redraw the image while an SVG filter is applied - for example, when dragging the cropped area or when changing the filter settings like the blur radius or edge mode. Safari also makes the image darker when applying any blur with an edge mode other than 'black' (which may be related to my use of &lt;feOffset&gt; and &lt;feTile&gt; to simulate edge modes 'duplicate' and 'wrap'), and seams may appear in the image as if the blurring were done in sections.
+<br>
+<br>You can use the following keyboard shortcuts (You may have to first click the background to de-focus any input element that currently has the focus):
+<br>
+<br>x = toggle experimental mode (which enables the polar and depolar SVG filters)
+<br>o = overlay / hide canvas
+<br>shift + arrow key = rotate image
+<br>
+<br>The code is on <a href="https://github.com/nightjuggler/pig">GitHub</a>.
+<br><input type="button" value="Close" onclick="hideAbout()" />
+</div>
 <canvas id="canvas"></canvas>
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
-<svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
+<svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs></defs></svg>
 </body>
 </html>
