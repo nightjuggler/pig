@@ -30,8 +30,8 @@ function setUserSpaceElement(f)
 	var x = Math.round(-photoLeft);
 	var y = Math.round(-photoTop);
 
-	var xValues = [x, x - filterMarginX, x + divWidth - 1];
-	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+	var xValues = [x, x - filterMarginX, x + divWidth - 1, x + divWidth];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1, y + divHeight];
 
 	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
 	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
@@ -57,8 +57,8 @@ function updateUserSpaceFilters()
 	var x = Math.round(-photoLeft);
 	var y = Math.round(-photoTop);
 
-	var xValues = [x, x - filterMarginX, x + divWidth - 1];
-	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+	var xValues = [x, x - filterMarginX, x + divWidth - 1, x + divWidth];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1, y + divHeight];
 
 	for (var f of userSpaceFilters)
 		for (var [fe, x, y, w, h] of f)
@@ -75,8 +75,8 @@ function resetUserSpaceFilters()
 	filterMarginX = Math.round(divWidth / 10);
 	filterMarginY = Math.round(divHeight / 10);
 
-	var xValues = [x, x - filterMarginX, x + divWidth - 1];
-	var yValues = [y, y - filterMarginY, y + divHeight - 1];
+	var xValues = [x, x - filterMarginX, x + divWidth - 1, x + divWidth];
+	var yValues = [y, y - filterMarginY, y + divHeight - 1, y + divHeight];
 
 	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
 	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
@@ -398,8 +398,8 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 
 	fe = document.createElementNS(svgNS, 'feOffset');
 	fe.setAttribute('in', 'SourceGraphic');
-	if (w < 0) fe.setAttribute('width', 1);
-	if (h < 0) fe.setAttribute('height', 1);
+	if (x >= 0) fe.setAttribute('width', 1);
+	if (y >= 0) fe.setAttribute('height', 1);
 	feList.push(fe);
 
 	f1.unshift(fe);
@@ -418,25 +418,49 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 }
 function dupTop(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupTop', [0, 0, 0, -1], [-1, -1, -1, 2]);
+	dup(feList, mergeList, userSpace, 'dupTop', [-1, 0, -1, -1], [-1, -1, -1, 2]);
 }
 function dupBottom(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupBottom', [0, 2, 0, -1], [-1, 2, -1, -1]);
+	dup(feList, mergeList, userSpace, 'dupBottom', [-1, 2, -1, -1], [-1, 3, -1, -1]);
 }
 function dupLeft(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupLeft', [0, 0, -1, 0], [-1, -1, 2, -1]);
+	dup(feList, mergeList, userSpace, 'dupLeft', [0, -1, -1, -1], [-1, -1, 2, -1]);
 }
 function dupRight(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupRight', [2, 0, -1, 0], [2, -1, -1, -1]);
+	dup(feList, mergeList, userSpace, 'dupRight', [2, -1, -1, -1], [3, -1, -1, -1]);
 }
-function createMerge(mergeList)
+function dupTopLeft(feList, mergeList, userSpace)
 {
-	var feMerge = document.createElementNS(svgNS, 'feMerge');
+	dup(feList, mergeList, userSpace, 'dupTopLeft', [0, 0, -1, -1], [-1, -1, 2, 2]);
+}
+function dupTopRight(feList, mergeList, userSpace)
+{
+	dup(feList, mergeList, userSpace, 'dupTopRight', [2, 0, -1, -1], [3, -1, -1, 2]);
+}
+function dupBottomLeft(feList, mergeList, userSpace)
+{
+	dup(feList, mergeList, userSpace, 'dupBottomLeft', [0, 2, -1, -1], [-1, 3, 2, -1]);
+}
+function dupBottomRight(feList, mergeList, userSpace)
+{
+	dup(feList, mergeList, userSpace, 'dupBottomRight', [2, 2, -1, -1], [3, 3, -1, -1]);
+}
+function createMerge(feList, mergeList, userSpaceElements)
+{
+	var fe = document.createElementNS(svgNS, 'feOffset');
+	fe.setAttribute('in', 'SourceGraphic');
+	fe.setAttribute('result', 'image');
+	feList.push(fe);
 
-	mergeList.push('SourceGraphic');
+	fe = [fe, 0, 0, 0, 0];
+	setUserSpaceElement(fe);
+	userSpaceElements.push(fe);
+	mergeList.push('image');
+
+	var feMerge = document.createElementNS(svgNS, 'feMerge');
 
 	for (var inName of mergeList)
 	{
@@ -445,7 +469,7 @@ function createMerge(mergeList)
 		feMerge.appendChild(feMergeNode);
 	}
 
-	return feMerge;
+	feList.push(feMerge);
 }
 function createSVGDBlur(radius, channels, edgeMode, isX)
 {
@@ -476,7 +500,7 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 		(isX ? (isLeft ? dupLeft : dupRight)
 			: (isLeft ? dupTop : dupBottom))(feList, mergeList, userSpaceElements);
 
-		feList.push(createMerge(mergeList));
+		createMerge(feList, mergeList, userSpaceElements);
 	}
 	else if (edgeMode === 'wrap')
 	{
@@ -535,7 +559,13 @@ function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 			dupTop(feList, mergeList, userSpaceElements);
 			dupBottom(feList, mergeList, userSpaceElements);
 		}
-		feList.push(createMerge(mergeList));
+		if (xRadius > 0 && yRadius > 0) {
+			dupTopLeft(feList, mergeList, userSpaceElements);
+			dupTopRight(feList, mergeList, userSpaceElements);
+			dupBottomLeft(feList, mergeList, userSpaceElements);
+			dupBottomRight(feList, mergeList, userSpaceElements);
+		}
+		createMerge(feList, mergeList, userSpaceElements);
 	}
 	else if (edgeMode === 'wrap')
 	{
