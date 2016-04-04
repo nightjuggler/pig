@@ -399,7 +399,9 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 	fe = document.createElementNS(svgNS, 'feOffset');
 	fe.setAttribute('in', 'SourceGraphic');
 	if (x >= 0) fe.setAttribute('width', 1);
+	else fe.setAttribute('x', '0%');
 	if (y >= 0) fe.setAttribute('height', 1);
+	else fe.setAttribute('y', '0%');
 	feList.push(fe);
 
 	f1.unshift(fe);
@@ -422,7 +424,7 @@ function dupTop(feList, mergeList, userSpace)
 }
 function dupBottom(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupBottom', [-1, 2, -1, -1], [-1, 3, -1, -1]);
+	dup(feList, mergeList, userSpace, 'dupBottom', [-1, 2, -1, -1], [-1, 3, -1, 2]);
 }
 function dupLeft(feList, mergeList, userSpace)
 {
@@ -430,7 +432,7 @@ function dupLeft(feList, mergeList, userSpace)
 }
 function dupRight(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupRight', [2, -1, -1, -1], [3, -1, -1, -1]);
+	dup(feList, mergeList, userSpace, 'dupRight', [2, -1, -1, -1], [3, -1, 2, -1]);
 }
 function dupTopLeft(feList, mergeList, userSpace)
 {
@@ -438,15 +440,15 @@ function dupTopLeft(feList, mergeList, userSpace)
 }
 function dupTopRight(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupTopRight', [2, 0, -1, -1], [3, -1, -1, 2]);
+	dup(feList, mergeList, userSpace, 'dupTopRight', [2, 0, -1, -1], [3, -1, 2, 2]);
 }
 function dupBottomLeft(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupBottomLeft', [0, 2, -1, -1], [-1, 3, 2, -1]);
+	dup(feList, mergeList, userSpace, 'dupBottomLeft', [0, 2, -1, -1], [-1, 3, 2, 2]);
 }
 function dupBottomRight(feList, mergeList, userSpace)
 {
-	dup(feList, mergeList, userSpace, 'dupBottomRight', [2, 2, -1, -1], [3, 3, -1, -1]);
+	dup(feList, mergeList, userSpace, 'dupBottomRight', [2, 2, -1, -1], [3, 3, 2, 2]);
 }
 function createMerge(feList, mergeList, userSpaceElements)
 {
