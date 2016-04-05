@@ -217,6 +217,10 @@ a:hover {
 #filterDiv select:first-child {
 	vertical-align: middle;
 }
+#filterNote {
+	font-style: italic;
+	margin-top: 2px;
+}
 .uiDiv {
 	display: inline-block;
 }
@@ -474,6 +478,7 @@ function startPhotoDrag(event)
 	startY = photo.offsetTop - event.clientY;
 	document.onmousemove = photoDrag;
 	document.onmouseup = releaseElement;
+	document.documentElement.focus();
 	return false;
 }
 function cropperDrag(event)
@@ -836,10 +841,10 @@ function crop()
 	var scaleX = divWidth / cropWidth;
 	var scaleY = divHeight / cropHeight;
 
-	photoLeft = -cropXField.value * scaleX;
-	photoTop = -cropYField.value * scaleY;
-	photo.style.width = (originalWidth * scaleX) + 'px';
-	photo.style.height = (originalHeight * scaleY) + 'px';
+	photoLeft = Math.round(-cropXField.value * scaleX);
+	photoTop = Math.round(-cropYField.value * scaleY);
+	photo.style.width = Math.round(originalWidth * scaleX) + 'px';
+	photo.style.height = Math.round(originalHeight * scaleY) + 'px';
 
 	transformPhoto();
 	setSpecParam();
@@ -1042,7 +1047,8 @@ function startControlDivDrag(event)
 }
 function preventDefault(event)
 {
-	if (event.preventDefault) event.preventDefault();
+	event.preventDefault();
+	document.documentElement.focus();
 }
 function centerElement(element, top, left)
 {
@@ -2416,19 +2422,7 @@ function createFilterDiv()
 		table.appendChild(tableRow);
 	}
 
-	var link = document.createElement('A');
-	link.href = '#';
-	link.appendChild(document.createTextNode('About'));
-	link.addEventListener('click', showAbout, false);
-
-	var note = document.createElement('DIV');
-	note.appendChild(document.createTextNode('The SVG filters for polar and depolar are disabled. See '));
-	note.appendChild(link);
-	note.appendChild(document.createTextNode('.'));
-
-	var filterDiv = document.getElementById('filterDiv');
-	filterDiv.appendChild(table);
-	filterDiv.appendChild(note);
+	document.getElementById('filterDiv').insertBefore(table, document.getElementById('filterNote'));
 }
 function toggleShowFilters(event)
 {
@@ -2539,7 +2533,7 @@ function updatePolarFilters()
 	var depolarIndex = filterIndex['depolar'];
 	var polar = filterOptions[polarIndex];
 	var depolar = filterOptions[depolarIndex];
-	var filterNote = document.getElementById('filterDiv').lastChild;
+	var filterNote = document.getElementById('filterNote');
 	var updateFilters = false;
 	var nameSuffix;
 
@@ -2669,6 +2663,7 @@ function bodyLoaded()
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	document.getElementById("copyCropGeometry").addEventListener("click", copyCropGeometry, false);
 	document.getElementById("aboutLink").addEventListener("click", showAbout, false);
+	document.getElementById("aboutLink2").addEventListener("click", showAbout, false);
 	document.getElementById("overlayCanvasLink").addEventListener("click", overlayCanvas, false);
 	document.addEventListener("keydown", documentKeyDown, false);
 	loadImage();
@@ -2725,7 +2720,7 @@ Crop Inverse Aspect Ratio
 <br>
 <div id="cropGeometryDiv"><input type="text" id="cropGeometry" size="44" value="" readonly />
 <a href="#" id="copyCropGeometry">Copy</a></div>
-<div id="filterDiv"></div>
+<div id="filterDiv"><div id="filterNote">The SVG filters for polar and depolar are disabled. See <a href="#" id="aboutLink2">About</a>.</div></div>
 </div>
 <div id="convolveInfoDiv">
 <b>Convolution Kernels</b>
@@ -2802,11 +2797,11 @@ Crop Inverse Aspect Ratio
 <input type="button" value="Close" onclick="convolveUI.hideInfo()" />
 </div>
 <div id="aboutDiv">
-This works best in Firefox. At the time of writing, I'm using Firefox 45, Chrome 49, and Safari 9.1.
+This works best in Firefox. At the time of writing, I'm using Firefox 45.0.1, Chrome 49, and Safari 9.1 on Mac OS X 10.11.4 (El Capitan).
 <br>
 <br>'Overlay Canvas' and 'Save' only work if the image you're viewing is either served from the same origin as this page or if the image was selected via 'Browse Files'. 'Overlay Canvas' and 'Save' will draw the image into an HTML canvas, get the image data from the canvas, apply the filter operations to the image data, and draw the image data back to the canvas.
 <br>
-<br>The SVG filters for polar and depolar are disabled by default because they only work well in Firefox. You can enable them by pressing 'x'. Pressing 'x' again disables them. You can also enable them by including 'x' in the query string of the URL, either immediately after the question mark or immediately after an ampersand. For example:
+<br>The SVG filters for polar and depolar are disabled by default because they only work well in Firefox. You can enable them by typing 'x'. Typing 'x' again disables them. You can also enable them by including 'x' in the query string of the URL, either immediately after the question mark or immediately after an ampersand. For example:
 <br>
 <br><a href="https://nightjuggler.com/pie/?f=polar&amp;x">https://nightjuggler.com/pie/?f=polar&amp;x</a>
 <br>
@@ -2816,7 +2811,7 @@ This works best in Firefox. At the time of writing, I'm using Firefox 45, Chrome
 <br>
 <br>In both Chrome and Safari, blurring an image often causes seams to appear in the image as if the blurring were done in sections.
 <br>
-<br>You can use the following keyboard shortcuts (You may have to first click the background to de-focus any input element that currently has the focus):
+<br>You can use the following keyboard shortcuts (<b>You may have to first click the page background to de-focus any input element that currently has the focus</b>):
 <br>
 <br>x = toggle experimental mode (which enables the polar and depolar SVG filters)
 <br>o = overlay / hide canvas
