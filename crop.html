@@ -385,6 +385,8 @@ var hiddenCanvas;
 var queryString;
 var copySupported = true;
 var showCropGeometry;
+var oldDivWidth;
+var oldDivHeight;
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
 var downloadLink;                // the HTML <a> element for the Save link
@@ -819,7 +821,7 @@ function setSpecParam()
 		+ document.getElementById("fileNameField").value + "', '"
 		+ cropWidth + "x" + cropHeight + "+"
 		+ cropXField.value + "+" + cropYField.value + "')";
-	resetUserSpaceFilters();
+	manageUserSpaceFilters();
 }
 function crop()
 {
@@ -864,7 +866,7 @@ function undo()
 
 	transformPhoto();
 	setCropperXY();
-	resetUserSpaceFilters();
+	manageUserSpaceFilters();
 
 	photo.onmousedown = preventDefault;
 	photo.style.cursor = 'default';
@@ -1047,10 +1049,12 @@ function centerElement(element, top, left)
 	if (top === undefined) {
 		var displayHeight = document.documentElement.clientHeight;
 		top = Math.round((displayHeight - element.clientHeight) / 2);
+		if (top < 8) top = 8;
 	}
 	if (left === undefined) {
 		var displayWidth = document.documentElement.clientWidth;
 		left = Math.round((displayWidth - element.clientWidth) / 2);
+		if (left < 8) left = 8;
 	}
 	element.style.top = top + "px";
 	element.style.left = left + "px";
@@ -1104,7 +1108,7 @@ function imageLoaded(event)
 
 	init();
 	hideLoading();
-	resetUserSpaceFilters();
+	manageUserSpaceFilters();
 
 	if (queryString.inverseAspectRatio) {
 		queryString.inverseAspectRatio = false;
@@ -1876,12 +1880,16 @@ function showFilterCode(event)
 	var css = '<span class="cT">-webkit-filter</span>: ' + filterStyle +
 		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
 
-	var html = document.getElementById('svgRoot').innerHTML;
-	var svg = '&lt;' + markupTag('svg width="0" height="0"')[1] + '&gt;';
+	var svgRoot = document.getElementById('svgRoot');
+	var svg = 'svg';
+	for (var name of ['width', 'height', 'xmlns', 'xmlns:xlink'])
+		svg += ' ' + name + '="' + svgRoot.getAttribute(name) + '"';
+	svg = '&lt;' + markupTag(svg)[1] + '&gt;';
 
 	var j = 0;
 	var indent = 0;
 	var previousTag = null;
+	var html = svgRoot.innerHTML;
 
 	while ((j = html.indexOf('<', j)) >= 0)
 	{
@@ -2502,6 +2510,29 @@ function copyCropGeometry(event)
 	document.getElementById("cropGeometry").select();
 	copyToClipboard();
 }
+function manageUserSpaceFilters()
+{
+	if (divWidth === oldDivWidth && divHeight === oldDivHeight) {
+		updateUserSpaceFilters();
+		return;
+	}
+
+	oldDivWidth = divWidth;
+	oldDivHeight = divHeight;
+	resetUserSpaceFilters();
+
+	var updateFilters = false;
+	for (var filter of filters)
+	{
+		var name = filter.option.name;
+		if (name === 'polar' || name === 'depolar') {
+			filter.manage = true;
+			updateFilters = true;
+		}
+	}
+	if (updateFilters)
+		applyFilters();
+}
 function updatePolarFilters()
 {
 	var polarIndex = filterIndex['polar'];
@@ -2773,7 +2804,7 @@ Crop Inverse Aspect Ratio
 <div id="aboutDiv">
 This works best in Firefox. At the time of writing, I'm using Firefox 45, Chrome 49, and Safari 9.1.
 <br>
-<br>'Overlay Canvas' and 'Save' only work if the image you're viewing is either served from the same origin (domain) as this page or if the image was selected via 'Browse Files'.
+<br>'Overlay Canvas' and 'Save' only work if the image you're viewing is either served from the same origin as this page or if the image was selected via 'Browse Files'. 'Overlay Canvas' and 'Save' will draw the image into an HTML canvas, get the image data from the canvas, apply the filter operations to the image data, and draw the image data back to the canvas.
 <br>
 <br>The SVG filters for polar and depolar are disabled by default because they only work well in Firefox. You can enable them by pressing 'x'. Pressing 'x' again disables them. You can also enable them by including 'x' in the query string of the URL, either immediately after the question mark or immediately after an ampersand. For example:
 <br>
@@ -2781,7 +2812,9 @@ This works best in Firefox. At the time of writing, I'm using Firefox 45, Chrome
 <br>
 <br>In Chrome, the SVG implementations for polar and depolar seem to work as long as you don't precede them with other filters.
 <br>
-<br>In Safari, the SVG implementations for polar and depolar don't work at all because Safari doesn't seem to allow the use of &lt;feImage&gt; in a filter that's applied to an HTML element like &lt;img&gt;. Safari also often doesn't redraw the image while an SVG filter is applied - for example, when dragging the cropped area or when changing the filter settings like the blur radius or edge mode. Safari also makes the image darker when applying any blur with an edge mode other than 'black' (which may be related to my use of &lt;feOffset&gt; and &lt;feTile&gt; to simulate edge modes 'duplicate' and 'wrap'), and seams may appear in the image as if the blurring were done in sections.
+<br>In Safari, the SVG implementations for polar and depolar don't work at all because Safari doesn't seem to allow the use of &lt;feImage&gt; in a filter that's applied to an HTML element like &lt;img&gt;. Safari also often doesn't redraw the image while an SVG filter is applied - for example, when dragging the cropped area or when changing the filter settings like the blur radius or edge mode. Safari also makes the image darker when applying any blur with an edge mode other than 'black' (which may be related to my use of &lt;feOffset&gt; and &lt;feTile&gt; to simulate edge modes 'duplicate' and 'wrap').
+<br>
+<br>In both Chrome and Safari, blurring an image often causes seams to appear in the image as if the blurring were done in sections.
 <br>
 <br>You can use the following keyboard shortcuts (You may have to first click the background to de-focus any input element that currently has the focus):
 <br>
