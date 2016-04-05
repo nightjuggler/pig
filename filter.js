@@ -399,9 +399,7 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 	fe = document.createElementNS(svgNS, 'feOffset');
 	fe.setAttribute('in', 'SourceGraphic');
 	if (x >= 0) fe.setAttribute('width', 1);
-	else fe.setAttribute('x', '0%');
 	if (y >= 0) fe.setAttribute('height', 1);
-	else fe.setAttribute('y', '0%');
 	feList.push(fe);
 
 	f1.unshift(fe);
