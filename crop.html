@@ -478,7 +478,7 @@ function startPhotoDrag(event)
 	startY = photo.offsetTop - event.clientY;
 	document.onmousemove = photoDrag;
 	document.onmouseup = releaseElement;
-	document.documentElement.focus();
+	blurActiveElement();
 	return false;
 }
 function cropperDrag(event)
@@ -524,6 +524,7 @@ function startCropperDrag(event)
 	startY = cropperTop - event.clientY;
 	document.onmousemove = cropperDrag;
 	document.onmouseup = releaseElement;
+	blurActiveElement();
 	return false;
 }
 function dragResize(event)
@@ -578,6 +579,7 @@ function startDragResize(event)
 	startY = event.clientY;
 	document.onmousemove = dragResize;
 	document.onmouseup = releaseElement;
+	blurActiveElement();
 	return false;
 }
 function startDragResizeNW(event)
@@ -1037,18 +1039,28 @@ function controlDivDrag(event)
 }
 function startControlDivDrag(event)
 {
-	if (event.target instanceof HTMLInputElement ||
-		event.target instanceof HTMLSelectElement) return true;
+	if (isInputElement(event.target)) return true;
 	startX = controlDiv.offsetLeft - event.clientX;
 	startY = controlDiv.offsetTop - event.clientY;
 	document.onmousemove = controlDivDrag;
 	document.onmouseup = releaseElement;
+	blurActiveElement();
 	return false;
+}
+function isInputElement(element)
+{
+	return element instanceof HTMLInputElement
+		|| element instanceof HTMLSelectElement
+		|| element instanceof HTMLOptionElement;
+}
+function blurActiveElement()
+{
+	if (isInputElement(document.activeElement)) document.activeElement.blur();
 }
 function preventDefault(event)
 {
 	event.preventDefault();
-	document.documentElement.focus();
+	blurActiveElement();
 }
 function centerElement(element, top, left)
 {
