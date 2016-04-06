@@ -1554,19 +1554,15 @@ function applyConvolution(context, imageData, value, channels, useAbsoluteValue)
 }
 function applyTiltShift(context, imageData, blurRadius, channels)
 {
+	var d = imageData.data;
 	var width = imageData.width;
 	var height = imageData.height;
 
 	var blurData = context.createImageData(imageData);
-
-	var b = blurData.data;
-	var d = imageData.data;
-
-	for (var i = 0, dLen = d.length; i < dLen; ++i) b[i] = d[i];
-
+	blurData.data.set(d);
 	blurData = applyBlur(context, blurData, blurRadius, blurRadius, channels, 'duplicate', 0);
+	var b = blurData.data;
 
-	b = blurData.data;
 	var setR = (channels & 1) === 1;
 	var setG = (channels & 2) === 2;
 	var setB = (channels & 4) === 4;
