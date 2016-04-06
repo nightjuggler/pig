@@ -1730,6 +1730,7 @@ new FilterOption('hue-rotate', 'deg',   0, 0,  360, simpleFilter(applyHueRotateF
 new FilterOption('threshold',  '',    128, 0,  256, simpleFilter(applyThreshold),        true,  createSVGThreshold),
 new FilterOption('invert',     '%',     0, 0,  100, simpleFilter(applyInvertFilter),     false, createSVGInvert),
 new FilterOption('convolve',   '',      0, 0,   12, applyConvolution,                    true,  createSVGConvolve),
+new FilterOption('tilt-shift', 'px',    0, 0,   20, applyTiltShift,                      true,  createTiltShift),
 new FilterOption('blur',       'px',    0, 0,   20, applyBlurFilter,                     true,  createBlurFilter),
 new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,                    true,  createBlurXFilter),
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),

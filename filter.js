@@ -603,6 +603,62 @@ function createBlurFilter(radius, channels, edgeMode)
 {
 	return createGaussianBlur(radius, radius, channels, edgeMode);
 }
+function createTiltShift(blurRadius, channels)
+{
+	var maskSVG =
+		'<svg xmlns="http://www.w3.org/2000/svg"' +
+			' width="100" height="100" viewBox="0 0 100 100">' +
+		'<defs>' +
+		'<linearGradient id="gradient" x2="0%" y2="100%">' +
+			'<stop offset="20%" stop-color="black" stop-opacity="1"></stop>' +
+			'<stop offset="50%" stop-color="black" stop-opacity="0"></stop>' +
+			'<stop offset="80%" stop-color="black" stop-opacity="1"></stop>' +
+		'</linearGradient>' +
+		'</defs>' +
+		'<rect x="0%" y="0%" width="100%" height="100%" fill="url(#gradient)"></rect>' +
+		'</svg>';
+
+	var maskURI = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(maskSVG);
+
+	var fe, feList = [];
+	var mergeList = [], userSpaceElements = [];
+
+	dupTop(feList, mergeList, userSpaceElements);
+	dupLeft(feList, mergeList, userSpaceElements);
+	dupRight(feList, mergeList, userSpaceElements);
+	dupBottom(feList, mergeList, userSpaceElements);
+	dupTopLeft(feList, mergeList, userSpaceElements);
+	dupTopRight(feList, mergeList, userSpaceElements);
+	dupBottomLeft(feList, mergeList, userSpaceElements);
+	dupBottomRight(feList, mergeList, userSpaceElements);
+	createMerge(feList, mergeList, userSpaceElements);
+
+	fe = document.createElementNS(svgNS, 'feGaussianBlur');
+	fe.setAttribute('stdDeviation', blurRadius);
+	fe.setAttribute('edgeMode', 'duplicate');
+	fe.setAttribute('result', 'blur');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feImage');
+	fe.setAttributeNS(xlinkNS, 'href', maskURI);
+	fe.setAttribute('preserveAspectRatio', 'none');
+	fe.setAttribute('result', 'mask');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in', 'blur');
+	fe.setAttribute('in2', 'mask');
+	fe.setAttribute('operator', 'in');
+	feList.push(fe);
+
+	fe = document.createElementNS(svgNS, 'feComposite');
+	fe.setAttribute('in2', 'SourceGraphic');
+	feList.push(fe);
+
+	var id = createFilter(channels, feList);
+	addUserSpaceFilter(id, 1, userSpaceElements);
+	return id;
+}
 function svgCannotImplement(amount, channels)
 {
 	return -1;
@@ -1495,4 +1551,62 @@ function applyConvolution(context, imageData, value, channels, useAbsoluteValue)
 		return convolution(context, imageData, channels, useAbsoluteValue);
 
 	return convolve3x3(context, imageData, channels, convolution, useAbsoluteValue);
+}
+function applyTiltShift(context, imageData, blurRadius, channels)
+{
+	var width = imageData.width;
+	var height = imageData.height;
+
+	var blurData = context.createImageData(imageData);
+
+	var b = blurData.data;
+	var d = imageData.data;
+
+	for (var i = 0, dLen = d.length; i < dLen; ++i) b[i] = d[i];
+
+	blurData = applyBlur(context, blurData, blurRadius, blurRadius, channels, 'duplicate', 0);
+
+	b = blurData.data;
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
+	var setA = (channels & 8) === 8;
+
+	var halfHeight = height / 2;
+	var gradientSize = 0.3;
+	var gradientHeight = gradientSize * height;
+
+	for (var y = 0, i = 0; y < height; ++y)
+	{
+		var maskAlpha = Math.abs(y - halfHeight) / gradientHeight;
+		if (maskAlpha >= 1) {
+			for (var x = 0; x < width; ++x, i += 4)
+			{
+				if (setR) d[i  ] = b[i  ];
+				if (setG) d[i+1] = b[i+1];
+				if (setB) d[i+2] = b[i+2];
+				if (setA) d[i+3] = b[i+3];
+
+				// d[i  ] = 0;
+				// d[i+1] = 0;
+				// d[i+2] = 0;
+				// d[i+3] = 255;
+			}
+		} else {
+			var sourceAlpha = 1 - maskAlpha;
+			for (var x = 0; x < width; ++x, i += 4)
+			{
+				if (setR) d[i  ] = b[i  ]*maskAlpha + d[i  ]*sourceAlpha;
+				if (setG) d[i+1] = b[i+1]*maskAlpha + d[i+1]*sourceAlpha;
+				if (setB) d[i+2] = b[i+2]*maskAlpha + d[i+2]*sourceAlpha;
+				if (setA) d[i+3] = b[i+3]*maskAlpha + d[i+3]*sourceAlpha;
+
+				// d[i  ] = 255*sourceAlpha;
+				// d[i+1] = 255*sourceAlpha;
+				// d[i+2] = 255*sourceAlpha;
+				// d[i+3] = 255;
+			}
+		}
+	}
+	return imageData;
 }
