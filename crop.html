@@ -84,9 +84,16 @@ code {
 .cT { color: rgb(0,100,0); } /* DarkGreen */
 .cA { color: rgb(128,0,128); } /* Purple */
 .cV { color: rgb(0,0,128); } /* Navy */
+.action {
+	background-color: rgb(245,222,179); /* Wheat */
+	border-radius: 6px;
+	color: rgb(0,0,205); /* MediumBlue */
+	padding: 0px 4px 0px 4px;
+}
 #aboutLink, #overlayCanvasLink {
 	background-color: rgb(245,222,179); /* Wheat */
 	border-radius: 6px;
+	display: inline-block;
 	padding: 4px;
 }
 #aboutDiv {
@@ -216,10 +223,6 @@ a:hover {
 }
 #filterDiv select:first-child {
 	vertical-align: middle;
-}
-#filterNote {
-	font-style: italic;
-	margin-top: 2px;
 }
 .uiDiv {
 	display: inline-block;
@@ -392,6 +395,8 @@ var showCropGeometry;
 var oldDivWidth;
 var oldDivHeight;
 
+var svgImage, svgMode = false;
+
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
 var downloadLink;                // the HTML <a> element for the Save link
 var downloadLinkReady = false;   // only used if downloadBlobURL is true
@@ -442,8 +447,13 @@ function photoDrag(event)
 	if (y > photoMaxTop) y = photoMaxTop;
 	else if (y < photoMinTop) y = photoMinTop;
 
-	photo.style.left = x + 'px';
-	photo.style.top = y + 'px';
+	if (svgMode) {
+		svgImage.setAttribute('x', x);
+		svgImage.setAttribute('y', y);
+	} else {
+		photo.style.left = x + 'px';
+		photo.style.top = y + 'px';
+	}
 
 	var x2 = Math.round(x / scaleX);
 	var y2 = Math.round(y / scaleY);
@@ -469,13 +479,18 @@ function photoDrag(event)
 		cropYField.value = -x2;
 	}
 
-	updateUserSpaceFilters();
+	if (!svgMode) updateUserSpaceFilters();
 	return false;
 }
 function startPhotoDrag(event)
 {
-	startX = photo.offsetLeft - event.clientX;
-	startY = photo.offsetTop - event.clientY;
+	if (svgMode) {
+		startX = svgImage.x.baseVal.value - event.clientX;
+		startY = svgImage.y.baseVal.value - event.clientY;
+	} else {
+		startX = photo.offsetLeft - event.clientX;
+		startY = photo.offsetTop - event.clientY;
+	}
 	document.onmousemove = photoDrag;
 	document.onmouseup = releaseElement;
 	blurActiveElement();
@@ -651,14 +666,6 @@ function setDisplayArea()
 
 	photoLeft = 0;
 	photoTop = 0;
-	photo.style.left = '0px';
-	photo.style.top = '0px';
-	photo.style.width = divWidth + 'px';
-	photo.style.height = divHeight + 'px';
-	photo.style.webkitTransform = null;
-	photo.style.transform = null;
-	photo.style.cursor = 'default';
-	photo.onmousedown = preventDefault;
 
 	var photoDiv = document.getElementById("photoDiv");
 	photoDiv.style.width = divWidth + 'px';
@@ -667,6 +674,28 @@ function setDisplayArea()
 	photoMinY = photoDiv.offsetTop + 4;
 	photoMaxX = photoDiv.offsetLeft + photoDiv.offsetWidth - 4;
 	photoMaxY = photoDiv.offsetTop + photoDiv.offsetHeight - 4;
+
+	if (svgMode) {
+		svgImage.setAttribute('x', 0);
+		svgImage.setAttribute('y', 0);
+		svgImage.setAttribute('width', divWidth);
+		svgImage.setAttribute('height', divHeight);
+		var svgRoot = svgImage.parentNode;
+		svgRoot.setAttribute('width', divWidth);
+		svgRoot.setAttribute('height', divHeight);
+		svgRoot.setAttribute('viewBox', [0, 0, divWidth, divHeight].join(' '));
+		svgRoot.style.transform = 'none';
+		svgRoot.style.cursor = 'default';
+		svgRoot.onmousedown = preventDefault;
+	} else {
+		photo.style.left = '0px';
+		photo.style.top = '0px';
+		photo.style.width = divWidth + 'px';
+		photo.style.height = divHeight + 'px';
+		photo.style.transform = 'none';
+		photo.style.cursor = 'default';
+		photo.onmousedown = preventDefault;
+	}
 
 	photoScale = originalWidth / divWidth;
 	rotateAngle = 0;
@@ -774,6 +803,20 @@ function changeCropHeight()
 	setCropHeight(+cropHeightField.value);
 	if (cropped) crop();
 }
+function setPhotoX(x)
+{
+	if (svgMode)
+		svgImage.setAttribute('x', x);
+	else
+		photo.style.left = x + 'px';
+}
+function setPhotoY(y)
+{
+	if (svgMode)
+		svgImage.setAttribute('y', y);
+	else
+		photo.style.top = y + 'px';
+}
 function changeCropX()
 {
 	var x = +cropXField.value;
@@ -786,15 +829,11 @@ function changeCropX()
 	cropXField.value = x;
 	setCropperXY();
 	if (cropped) {
-		photoLeft = -x * divWidth / cropWidth;
-		if (rotateAngle === 0)
-			photo.style.left = photoLeft + 'px';
-		else if (rotateAngle === 90)
-			photo.style.top = photoLeft + 'px';
-		else if (rotateAngle === 180)
-			photo.style.left = -photoLeft + 'px';
-		else if (rotateAngle === 270)
-			photo.style.top = -photoLeft + 'px';
+		photoLeft = Math.round(-x * divWidth / cropWidth);
+		if (rotateAngle === 0) setPhotoX(photoLeft);
+		else if (rotateAngle === 90) setPhotoY(photoLeft);
+		else if (rotateAngle === 180) setPhotoX(-photoLeft);
+		else if (rotateAngle === 270) setPhotoY(-photoLeft);
 		setSpecParam();
 	}
 }
@@ -810,15 +849,11 @@ function changeCropY()
 	cropYField.value = y;
 	setCropperXY();
 	if (cropped) {
-		photoTop = -y * divHeight / cropHeight;
-		if (rotateAngle === 0)
-			photo.style.top = photoTop + 'px';
-		else if (rotateAngle === 90)
-			photo.style.left = -photoTop + 'px';
-		else if (rotateAngle === 180)
-			photo.style.top = -photoTop + 'px';
-		else if (rotateAngle === 270)
-			photo.style.left = photoTop + 'px';
+		photoTop = Math.round(-y * divHeight / cropHeight);
+		if (rotateAngle === 0) setPhotoY(photoTop);
+		else if (rotateAngle === 90) setPhotoX(-photoTop);
+		else if (rotateAngle === 180) setPhotoY(-photoTop);
+		else if (rotateAngle === 270) setPhotoX(photoTop);
 		setSpecParam();
 	}
 }
@@ -832,58 +867,83 @@ function setSpecParam()
 }
 function crop()
 {
-	if (cropInverseAspectRatio && !cropped) {
-		turnPhotoDiv();
-		var width = divWidth;
-		var height = divHeight;
-		divWidth = height;
-		divHeight = width;
-	}
+	if (cropInverseAspectRatio && !cropped)
+		turnPhotoDiv(true);
 
 	var scaleX = divWidth / cropWidth;
 	var scaleY = divHeight / cropHeight;
 
+	var width = Math.round(originalWidth * scaleX);
+	var height = Math.round(originalHeight * scaleY);
+
 	photoLeft = Math.round(-cropXField.value * scaleX);
 	photoTop = Math.round(-cropYField.value * scaleY);
-	photo.style.width = Math.round(originalWidth * scaleX) + 'px';
-	photo.style.height = Math.round(originalHeight * scaleY) + 'px';
+
+	if (svgMode) {
+		svgImage.setAttribute('width', width);
+		svgImage.setAttribute('height', height);
+	} else {
+		photo.style.width = width + 'px';
+		photo.style.height = height + 'px';
+	}
 
 	transformPhoto();
 	setSpecParam();
 
 	cropped = true;
 	cropper.style.display = 'none';
-	photo.onmousedown = startPhotoDrag;
-	photo.style.cursor = 'move';
+
+	if (svgMode) {
+		svgImage.parentNode.onmousedown = startPhotoDrag;
+		svgImage.parentNode.style.cursor = 'move';
+	} else {
+		photo.onmousedown = startPhotoDrag;
+		photo.style.cursor = 'move';
+	}
 }
 function undo()
 {
-	if (cropInverseAspectRatio && cropped) {
-		turnPhotoDiv();
-		var width = divWidth;
-		var height = divHeight;
-		divWidth = height;
-		divHeight = width;
-	}
+	if (cropInverseAspectRatio && cropped)
+		turnPhotoDiv(true);
 
 	photoLeft = 0;
 	photoTop = 0;
-	photo.style.width = divWidth + 'px';
-	photo.style.height = divHeight + 'px';
+
+	if (svgMode) {
+		svgImage.setAttribute('width', divWidth);
+		svgImage.setAttribute('height', divHeight);
+	} else {
+		photo.style.width = divWidth + 'px';
+		photo.style.height = divHeight + 'px';
+	}
 
 	transformPhoto();
 	setCropperXY();
 	manageUserSpaceFilters();
 
-	photo.onmousedown = preventDefault;
-	photo.style.cursor = 'default';
+	if (svgMode) {
+		svgImage.parentNode.onmousedown = preventDefault;
+		svgImage.parentNode.style.cursor = 'default';
+	} else {
+		photo.onmousedown = preventDefault;
+		photo.style.cursor = 'default';
+	}
 	cropper.style.display = 'block';
 	cropped = false;
 }
 function transformPhoto()
 {
-	var transform = null;
-	var delta = (photo.offsetWidth - photo.offsetHeight) / 2;
+	var transform = "none";
+	var photoWidth;
+	var photoHeight;
+	if (svgMode) {
+		photoWidth = svgImage.width.baseVal.value;
+		photoHeight = svgImage.height.baseVal.value;
+	} else {
+		photoWidth = photo.offsetWidth;
+		photoHeight = photo.offsetHeight;
+	}
+	var delta = (photoWidth - photoHeight) / 2;
 	var dX = 0;
 	var dY = 0;
 	var left = photoLeft;
@@ -891,29 +951,34 @@ function transformPhoto()
 
 	if (rotateAngle === 90) {
 		dX = delta;
-		dY = delta + photo.offsetHeight - divHeight;
+		dY = delta + photoHeight - divHeight;
 		left = -photoTop;
 		top = photoLeft;
 	} else if (rotateAngle === 180) {
-		dX = photo.offsetWidth - divWidth;
-		dY = photo.offsetHeight - divHeight;
+		dX = photoWidth - divWidth;
+		dY = photoHeight - divHeight;
 		left = -photoLeft;
 		top = -photoTop;
 	} else if (rotateAngle === 270) {
-		dX = -delta + photo.offsetWidth - divWidth;
+		dX = -delta + photoWidth - divWidth;
 		dY = -delta;
 		left = photoTop;
 		top = -photoLeft;
 	}
 
-	if (rotateAngle !== 0 || dX !== 0 || dY !== 0) {
+	if (rotateAngle !== 0) {
 		transform = "rotate(" + rotateAngle + "deg)";
 		transform += " translate(" + dX + "px," + dY + "px)";
 	}
-	photo.style.webkitTransform = transform;
-	photo.style.transform = transform;
-	photo.style.left = left + 'px';
-	photo.style.top = top + 'px';
+	if (svgMode) {
+		svgImage.parentNode.style.transform = transform;
+		svgImage.setAttribute('x', left);
+		svgImage.setAttribute('y', top);
+	} else {
+		photo.style.transform = transform;
+		photo.style.left = left + 'px';
+		photo.style.top = top + 'px';
+	}
 }
 function setCropperXY()
 {
@@ -935,7 +1000,7 @@ function setCropperXY()
 	cropper.style.left = cropperLeft + 'px';
 	cropper.style.top = cropperTop + 'px';
 }
-function turnPhotoDiv()
+function turnPhotoDiv(swap)
 {
 	var photoDiv = document.getElementById("photoDiv");
 	var width = photoDiv.offsetWidth - 8;
@@ -946,6 +1011,18 @@ function turnPhotoDiv()
 	photoMinY = photoDiv.offsetTop + 4;
 	photoMaxX = photoDiv.offsetLeft + photoDiv.offsetWidth - 4;
 	photoMaxY = photoDiv.offsetTop + photoDiv.offsetHeight - 4;
+	if (swap) {
+		width = divWidth;
+		height = divHeight;
+		divWidth = height;
+		divHeight = width;
+		if (svgMode) {
+			var svgRoot = svgImage.parentNode;
+			svgRoot.setAttribute('width', divWidth);
+			svgRoot.setAttribute('height', divHeight);
+			svgRoot.setAttribute('viewBox', [0, 0, divWidth, divHeight].join(' '));
+		}
+	}
 }
 function rotatePhoto(angle)
 {
@@ -954,7 +1031,7 @@ function rotatePhoto(angle)
 	var oldCropperLeft = cropperLeft - photoMinX;
 	var oldCropperTop = cropperTop - photoMinY;
 	if (angle === 90 || angle === 270) {
-		turnPhotoDiv();
+		turnPhotoDiv(false);
 		swapXYFilters(angle);
 		var width = cropperWidth;
 		var height = cropperHeight;
@@ -1023,11 +1100,7 @@ function toggleInverseAspectRatio()
 		setCropWidth(cropHeight);
 
 	if (cropped) {
-		turnPhotoDiv();
-		var width = divWidth;
-		var height = divHeight;
-		divWidth = height;
-		divHeight = width;
+		turnPhotoDiv(true);
 		crop();
 	}
 }
@@ -1121,6 +1194,9 @@ function imageLoaded(event)
 	originalWidth = imageObject.width;
 	originalHeight = imageObject.height;
 
+	if (svgMode)
+		svgImage.setAttributeNS(xlinkNS, "href", imageObject.src);
+
 	if (imageFiles !== undefined)
 		URL.revokeObjectURL(imageObject.src);
 
@@ -1152,10 +1228,6 @@ function imageLoaded(event)
 	if (queryString.overlayCanvas) {
 		queryString.overlayCanvas = false;
 		document.getElementById("overlayCanvasLink").click();
-	}
-	if (queryString.experimentalMode) {
-		queryString.experimentalMode = false;
-		updatePolarFilters();
 	}
 }
 function imageFailedLoad(event)
@@ -1736,8 +1808,8 @@ new FilterOption('blur-x',     'px',    0, 0,   40, applyBlurXFilter,           
 new FilterOption('blur-y',     'px',    0, 0,   40, applyBlurYFilter,                    true,  createBlurYFilter),
 new FilterOption('d-blur-x',   'px',    0,-40,  40, applyDBlurX,                         true,  createSVGDBlurX),
 new FilterOption('d-blur-y',   'px',    0,-40,  40, applyDBlurY,                         true,  createSVGDBlurY),
-new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  svgCannotImplement),
-new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  svgCannotImplement),
+new FilterOption('polar',      '',      0, 0,    3, applyPolarTransform,                 true,  createSVGPolar),
+new FilterOption('depolar',    '',      0, 0,    3, applyReversePolarTransform,          true,  createSVGReversePolar),
 ];
 function Filter(tableCell, info)
 {
@@ -1829,6 +1901,10 @@ function markupTag(inData)
 	var tag = k < 0 ? inData : inData.substr(0, k);
 	var outData = '<span class="cT">' + tag + '</span>';
 
+	var v;
+	var dataPrefix = 'data:image/png;base64,';
+	var dataPrefixLen = dataPrefix.length;
+
 	var i = tag.length + 1;
 	while (i < inData.length)
 	{
@@ -1836,7 +1912,11 @@ function markupTag(inData)
 		outData += ' <span class="cA">' + inData.substr(i, k - i) + '</span>';
 		i = k + 2;
 		k = inData.indexOf('"', i);
-		outData += '=&quot;<span class="cV">' + inData.substr(i, k - i) + '</span>&quot;';
+		if (k - i > dataPrefixLen && inData.substr(i, dataPrefixLen) === dataPrefix)
+			v = dataPrefix + '&hellip;';
+		else
+			v = inData.substr(i, k - i);
+		outData += '=&quot;<span class="cV">' + v + '</span>&quot;';
 		i = k + 2;
 	}
 
@@ -1975,16 +2055,36 @@ function hideFilterCode()
 {
 	document.getElementById("filterCodeDiv").style.display = "none";
 }
-function applyFilters()
+function applyFiltersSVG()
+{
+	prevFilterId = 0;
+	for (var filter of filters)
+	{
+		if (filter.manage)
+			manageFilter(filter);
+		if (filter.id > 0)
+			prevFilterId = filter.id;
+	}
+	var filter = prevFilterId > 0 ? 'url(#' + svgFilter.id + ')' : 'none';
+	if (svgMode) {
+		if (!svgImage) return;
+		if (prevFilterId > 0)
+			svgImage.setAttribute('filter', filter);
+		else
+			svgImage.removeAttribute('filter');
+	} else {
+		photo.style.webkitFilter = filter;
+		photo.style.filter = filter;
+	}
+}
+function applyFiltersHTML()
 {
 	var filterList = [];
 	for (var filter of filters)
 	{
 		var option = filter.option;
-		if (filter.value === option.noChangeValue || filter.channels === 0)
-			continue;
 		if (filter.manage)
-			manageFilter(filter, option);
+			manageFilter(filter);
 		if (filter.id === 0)
 			filterList.push(option.name + '(' + filter.value + option.unit + ')');
 		else if (filter.id > 0)
@@ -1994,25 +2094,123 @@ function applyFilters()
 	photo.style.webkitFilter = filterStyle;
 	photo.style.filter = filterStyle;
 }
-function manageFilter(filter, option)
+var applyFilters = singleFilter ? applyFiltersSVG : applyFiltersHTML;
+function manageFilter(filter)
 {
-	if (filter.id !== 0)
-	{
+	var option = filter.option;
+	if (filter.id > 0)
 		removeSVGFilter(filter.id);
-		filter.id = 0;
-	}
-	if (option.svgOnly || filter.channels < 7)
-	{
+	if (filter.value === option.noChangeValue || filter.channels === 0) {
+		filter.id = -1;
+	} else if (singleFilter || option.svgOnly || filter.channels < 7) {
 		var amount = option.unit === '%' ? filter.value / 100 : filter.value;
 		var info = option.ui.getInfo ? option.ui.getInfo(filter) : undefined;
 
 		filter.id = option.createSVGFilter(amount, filter.channels, info);
+	} else {
+		filter.id = 0;
 	}
 	filter.manage = false;
 }
 function manageFilters(filter)
 {
 	filter.manage = true;
+	applyFilters();
+}
+function toggleSingleFilter()
+{
+	for (var filter of filters)
+	{
+		if (filter.id > 0)
+			removeSVGFilter(filter.id);
+		filter.id = 0;
+		filter.manage = true;
+	}
+
+	singleFilter = !singleFilter;
+	applyFilters = singleFilter ? applyFiltersSVG : applyFiltersHTML;
+}
+function replaceHTMLImgWithSVGImage()
+{
+	var photoLoaded = (photo.src !== "");
+
+	var svgRoot = document.getElementById('svgRoot');
+
+	svgImage = document.createElementNS(svgNS, 'image');
+	if (photoLoaded) {
+		svgImage.setAttributeNS(xlinkNS, 'href', photo.src);
+		svgImage.setAttribute('x', photo.style.left.slice(0, -2));
+		svgImage.setAttribute('y', photo.style.top.slice(0, -2));
+		svgImage.setAttribute('width', photo.offsetWidth);
+		svgImage.setAttribute('height', photo.offsetHeight);
+	}
+
+	svgRoot.appendChild(svgImage);
+	photo.parentNode.replaceChild(svgRoot, photo);
+
+	if (photoLoaded) {
+		svgRoot.setAttribute('width', divWidth);
+		svgRoot.setAttribute('height', divHeight);
+		svgRoot.setAttribute('viewBox', [0, 0, divWidth, divHeight].join(' '));
+		svgRoot.style.transform = photo.style.transform;
+		svgRoot.style.cursor = photo.style.cursor;
+		svgRoot.onmousedown = photo.onmousedown;
+
+		photo.style.left = '0px';
+		photo.style.top = '0px';
+		photo.style.width = divWidth + 'px';
+		photo.style.height = divHeight + 'px';
+		photo.style.transform = 'none';
+		photo.style.cursor = 'default';
+		photo.onmousedown = null;
+	}
+
+	photo.style.webkitFilter = 'none';
+	photo.style.filter = 'none';
+}
+function replaceSVGImageWithHTMLImg()
+{
+	var svgRoot = svgImage.parentNode;
+	svgRoot.parentNode.replaceChild(photo, svgRoot);
+
+	if (photo.src !== "") {
+		photo.style.left = svgImage.getAttribute('x') + 'px';
+		photo.style.top = svgImage.getAttribute('y') + 'px';
+		photo.style.width = svgImage.getAttribute('width') + 'px';
+		photo.style.height = svgImage.getAttribute('height') + 'px';
+		photo.style.transform = svgRoot.style.transform;
+		photo.style.cursor = svgRoot.style.cursor;
+		photo.onmousedown = svgRoot.onmousedown;
+
+		svgRoot.setAttribute('width', 0);
+		svgRoot.setAttribute('height', 0);
+		svgRoot.removeAttribute('viewBox');
+		svgRoot.style.transform = 'none';
+		svgRoot.style.cursor = 'default';
+		svgRoot.onmousedown = null;
+	}
+
+	svgRoot.removeChild(svgImage);
+	document.body.appendChild(svgRoot);
+}
+function changeMode()
+{
+	var mode = +document.getElementById('modeSelect').value;
+
+	var _svgMode = (mode & 2) !== 0;
+	var _singleFilter = (mode & 1) !== 0;
+
+	if (svgMode !== _svgMode) {
+		svgMode = _svgMode;
+		if (svgMode)
+			replaceHTMLImgWithSVGImage();
+		else
+			replaceSVGImageWithHTMLImg();
+		if (singleFilter && _singleFilter && filterMarginX !== undefined)
+			updateUserSpaceFilters();
+	}
+	if (singleFilter !== _singleFilter)
+		toggleSingleFilter();
 	applyFilters();
 }
 function changeFilterName(event)
@@ -2149,7 +2347,7 @@ function removeFilterRow(event)
 	tableRow.parentNode.removeChild(tableRow);
 
 	var filterId = filters[rowNumber].id;
-	if (filterId !== 0)
+	if (filterId > 0)
 		removeSVGFilter(filterId);
 
 	for (var i = rowNumber; i < filters.length - 1; ++i)
@@ -2245,12 +2443,7 @@ function createFilterRow(rowNumber, info)
 
 	var selectElement = document.createElement('SELECT');
 	for (var option of filterOptions)
-	{
-		var name = option.name;
-		if (option.createSVGFilter === svgCannotImplement)
-			name += ' *';
-		selectElement.add(new Option(name, option.name));
-	}
+		selectElement.add(new Option(option.name, option.name));
 
 	selectElement.selectedIndex = filterIndex[info.name];
 	selectElement.addEventListener('change', changeFilterName, false);
@@ -2315,7 +2508,6 @@ function parseQueryString()
 		cropGeometry: null,
 		rotateAngle: 0,
 		inverseAspectRatio: false,
-		experimentalMode: false,
 	};
 
 	var q = window.location.search;
@@ -2330,10 +2522,6 @@ function parseQueryString()
 		}
 		if (s === 'iar') {
 			queryString.inverseAspectRatio = true;
-			continue;
-		}
-		if (s === 'x') {
-			queryString.experimentalMode = true;
 			continue;
 		}
 		var i = s.indexOf('=');
@@ -2435,7 +2623,8 @@ function createFilterDiv()
 		table.appendChild(tableRow);
 	}
 
-	document.getElementById('filterDiv').insertBefore(table, document.getElementById('filterNote'));
+	var filterDiv = document.getElementById('filterDiv');
+	filterDiv.insertBefore(table, filterDiv.firstChild);
 }
 function toggleShowFilters(event)
 {
@@ -2520,7 +2709,7 @@ function copyCropGeometry(event)
 function manageUserSpaceFilters()
 {
 	if (divWidth === oldDivWidth && divHeight === oldDivHeight) {
-		updateUserSpaceFilters();
+		if (!svgMode) updateUserSpaceFilters();
 		return;
 	}
 
@@ -2533,40 +2722,6 @@ function manageUserSpaceFilters()
 	{
 		var name = filter.option.name;
 		if (name === 'polar' || name === 'depolar') {
-			filter.manage = true;
-			updateFilters = true;
-		}
-	}
-	if (updateFilters)
-		applyFilters();
-}
-function updatePolarFilters()
-{
-	var polarIndex = filterIndex['polar'];
-	var depolarIndex = filterIndex['depolar'];
-	var polar = filterOptions[polarIndex];
-	var depolar = filterOptions[depolarIndex];
-	var filterNote = document.getElementById('filterNote');
-	var updateFilters = false;
-	var nameSuffix;
-
-	if (polar.createSVGFilter === svgCannotImplement) {
-		filterNote.style.display = 'none';
-		polar.createSVGFilter = createSVGPolar;
-		depolar.createSVGFilter = createSVGReversePolar;
-		nameSuffix = '';
-	} else {
-		filterNote.style.display = 'block';
-		polar.createSVGFilter = svgCannotImplement;
-		depolar.createSVGFilter = svgCannotImplement;
-		nameSuffix = ' *';
-	}
-	for (var filter of filters)
-	{
-		filter.selectElement.options[polarIndex].text = 'polar' + nameSuffix;
-		filter.selectElement.options[depolarIndex].text = 'depolar' + nameSuffix;
-
-		if (filter.option === polar || filter.option === depolar) {
 			filter.manage = true;
 			updateFilters = true;
 		}
@@ -2599,8 +2754,6 @@ function documentKeyDown(event)
 			return true;
 		if (document.getElementById("canvas").style.display === 'block')
 			drawCanvas();
-	} else if (key === 'x' || key === 'U+0058') {
-		updatePolarFilters();
 	} else
 		return true;
 
@@ -2676,9 +2829,10 @@ function bodyLoaded()
 	document.getElementById("fileBrowserLink").addEventListener("click", browseFiles, false);
 	document.getElementById("copyCropGeometry").addEventListener("click", copyCropGeometry, false);
 	document.getElementById("aboutLink").addEventListener("click", showAbout, false);
-	document.getElementById("aboutLink2").addEventListener("click", showAbout, false);
 	document.getElementById("overlayCanvasLink").addEventListener("click", overlayCanvas, false);
+	document.getElementById("modeSelect").addEventListener("change", changeMode, false);
 	document.addEventListener("keydown", documentKeyDown, false);
+	changeMode();
 	loadImage();
 }
 </script>
@@ -2733,7 +2887,10 @@ Crop Inverse Aspect Ratio
 <br>
 <div id="cropGeometryDiv"><input type="text" id="cropGeometry" size="44" value="" readonly />
 <a href="#" id="copyCropGeometry">Copy</a></div>
-<div id="filterDiv"><div id="filterNote">The SVG filters for polar and depolar are disabled. See <a href="#" id="aboutLink2">About</a>.</div></div>
+<div id="filterDiv"><div><span style="margin: 2px;">Mode:</span><select id="modeSelect">
+<option value="3">SVG &lt;image&gt;</option>
+<option value="0">HTML &lt;img&gt;</option>
+<option value="1">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</option></select></div></div>
 </div>
 <div id="convolveInfoDiv">
 <b>Convolution Kernels</b>
@@ -2809,31 +2966,26 @@ Crop Inverse Aspect Ratio
 </table>
 <input type="button" value="Close" onclick="convolveUI.hideInfo()" />
 </div>
-<div id="aboutDiv">
-This works best in Firefox. At the time of writing, I'm using Firefox 45.0.1, Chrome 49, and Safari 9.1 on Mac OS X 10.11.4 (El Capitan).
-<br>
-<br>'Overlay Canvas' and 'Save' only work if the image you're viewing is either served from the same origin as this page or if the image was selected via 'Browse Files'. 'Overlay Canvas' and 'Save' will draw the image into an HTML canvas, get the image data from the canvas, apply the filter operations to the image data, and draw the image data back to the canvas.
-<br>
-<br>The SVG filters for polar and depolar are disabled by default because they only work well in Firefox. You can enable them by typing 'x'. Typing 'x' again disables them. You can also enable them by including 'x' in the query string of the URL, either immediately after the question mark or immediately after an ampersand. For example:
-<br>
-<br><a href="https://nightjuggler.com/pie/?f=polar&amp;x">https://nightjuggler.com/pie/?f=polar&amp;x</a>
-<br>
-<br>In Chrome, the SVG implementations for polar and depolar seem to work as long as you don't precede them with other filters.
-<br>
-<br>In Safari, the SVG implementations for polar and depolar don't work at all because Safari doesn't seem to allow the use of &lt;feImage&gt; in a filter that's applied to an HTML element like &lt;img&gt;. Safari also often doesn't redraw the image while an SVG filter is applied - for example, when dragging the cropped area or when changing the filter settings like the blur radius or edge mode. Safari also makes the image darker when applying any blur with an edge mode other than 'black' (which may be related to my use of &lt;feOffset&gt; and &lt;feTile&gt; to simulate edge modes 'duplicate' and 'wrap').
-<br>
-<br>In both Chrome and Safari, blurring an image often causes seams to appear in the image as if the blurring were done in sections.
-<br>
-<br>You can use the following keyboard shortcuts (<b>You may have to first click the page background to de-focus any input element that currently has the focus</b>):
-<br>
-<br>x = toggle experimental mode (which enables the polar and depolar SVG filters)
-<br>o = overlay / hide canvas
-<br>shift + arrow key = rotate image
-<br>
-<br>The code is on <a href="https://github.com/nightjuggler/pig">GitHub</a>.
-<br><input type="button" value="Close" onclick="hideAbout()" />
-</div>
 <canvas id="canvas"></canvas>
+<div id="aboutDiv">
+<div style="text-align: center;">
+<b>PIE (Pius' Image Editor)</b>
+[<a href="https://github.com/nightjuggler/pig">GitHub</a>]
+</div><br>
+<div style="text-align: justify;">
+Note that <span class="action">Overlay Canvas</span> and <span class="action">Save</span> will
+only work if the image you're viewing is either served from the same origin as this page or if
+the image was selected via <span class="action">Browse Files</span>. <span class="action">Overlay
+Canvas</span> and <span class="action">Save</span> will draw the image into an HTML canvas, get
+the image data from the canvas (which the browser will not allow for cross-origin images), apply
+the filter operations to the image data, and draw the image data back to the canvas.
+<br><br>
+For best results in Chrome, use mode <span class="action">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</span>.
+For best results in Safari, use mode <span class="action">SVG &lt;image&gt;</span>.
+All modes seem to work equally well in Firefox.
+</div>
+<div style="text-align: center;"><input type="button" value="Close" onclick="hideAbout()" /></div>
+</div>
 <div id="progressDiv"><span id="progressText">Loading</span><div id="spinDisc"></div></div>
 <div id="failedDiv">Failed to load<br><input type="button" value="Close" onclick="hideFailed()" /></div>
 <svg id="svgRoot" width="0" height="0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs></defs></svg>

@@ -3,32 +3,96 @@ var xlinkNS = 'http://www.w3.org/1999/xlink';
 var svgFilterId = 0;
 var svgFilterIdBin = [];
 var channelMap = [['R', 1], ['G', 2], ['B', 4]];
-var divWidth, divHeight;
-var photoLeft, photoTop;
-var userSpaceFilters = [];
+var singleFilter = true;
+var prevFilterId;
+var svgFilter;
+var userSpaceFilters = new Map();
+var firstElementMap = new Map();
+var lastElementMap = new Map();
 var filterMarginX;
 var filterMarginY;
 
+function renameSourceGraphic(feList)
+{
+	for (var fe of feList)
+	{
+		if (fe.getAttribute('in') === 'SourceGraphic') fe.setAttribute('in', 'FilterResult');
+		if (fe.getAttribute('in2') === 'SourceGraphic') fe.setAttribute('in2', 'FilterResult');
+	}
+}
+function renameSourceGraphic2(fe, undo)
+{
+	var oldName, newName;
+
+	if (undo) {
+		oldName = 'FilterResult';
+		newName = 'SourceGraphic';
+	} else {
+		oldName = 'SourceGraphic';
+		newName = 'FilterResult';
+	}
+
+	for (; fe; fe = fe.nextSibling)
+	{
+		if (fe.getAttribute('in') === oldName) fe.setAttribute('in', newName);
+		if (fe.getAttribute('in2') === oldName) fe.setAttribute('in2', newName);
+		if (fe.getAttribute('result') === 'FilterResult') break;
+	}
+}
 function removeSVGFilter(id)
 {
-	if (id <= 0) return;
-	var idStr = 'filter' + id;
-	var filterElement = document.getElementById(idStr);
-	filterElement.parentNode.removeChild(filterElement);
-	svgFilterIdBin.push(id);
+	var resetFilterId = false;
 
-	for (var i = 0, len = userSpaceFilters.length; i < len; ++i)
-		if (userSpaceFilters[i][0][0].id === idStr) {
-			userSpaceFilters.splice(i, 1);
-			break;
+	if (singleFilter) {
+		var next = firstElementMap.get(id);
+		var last = lastElementMap.get(id);
+		var prev = next.previousSibling;
+		var element = null;
+
+		while (element !== last)
+		{
+			element = next;
+			next = element.nextSibling;
+			svgFilter.removeChild(element);
 		}
+
+		firstElementMap.delete(id);
+		lastElementMap.delete(id);
+
+		if (next) {
+			if (!prev) renameSourceGraphic2(next, true);
+		} else
+			if (prev) prev.removeAttribute('result');
+		else {
+			resetFilterId = true;
+			userSpaceFilters.delete(svgFilter.id);
+			svgFilter.parentNode.removeChild(svgFilter);
+			svgFilter = null;
+		}
+	} else {
+		var filterElement = document.getElementById('filter' + id);
+		var filterParent = filterElement.parentNode;
+		filterParent.removeChild(filterElement);
+		if (!filterParent.firstChild) resetFilterId = true;
+	}
+
+	userSpaceFilters.delete(id);
+
+	if (resetFilterId) {
+		svgFilterId = 0;
+		svgFilterIdBin.splice(0);
+	} else
+		svgFilterIdBin.push(id);
 }
-function setUserSpaceElement(f)
+function setUserSpaceElements(id, userSpaceElements)
 {
+	userSpaceFilters.set(id, userSpaceElements);
+
 	if (filterMarginX === undefined) return;
 
 	var x = Math.round(-photoLeft);
 	var y = Math.round(-photoTop);
+	if (svgMode) x = y = 0;
 
 	var xValues = [x, x - filterMarginX, x + divWidth - 1, x + divWidth];
 	var yValues = [y, y - filterMarginY, y + divHeight - 1, y + divHeight];
@@ -36,31 +100,24 @@ function setUserSpaceElement(f)
 	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
 	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
 
-	var [fe, x, y, w, h] = f;
-
-	if (x >= 0) fe.setAttribute('x', xValues[x]);
-	if (y >= 0) fe.setAttribute('y', yValues[y]);
-	if (w >= 0) fe.setAttribute('width', widths[w]);
-	if (h >= 0) fe.setAttribute('height', heights[h]);
-}
-function addUserSpaceFilter(id, i, feList)
-{
-	var fe = document.getElementById('filter' + id);
-	fe.setAttribute('filterUnits', 'userSpaceOnUse');
-	var f = [fe, i, i, i, i];
-	feList.unshift(f);
-	setUserSpaceElement(f);
-	userSpaceFilters.push(feList);
+	for (var [fe, x, y, w, h] of userSpaceElements)
+	{
+		if (x >= 0) fe.setAttribute('x', xValues[x]);
+		if (y >= 0) fe.setAttribute('y', yValues[y]);
+		if (w >= 0) fe.setAttribute('width', widths[w]);
+		if (h >= 0) fe.setAttribute('height', heights[h]);
+	}
 }
 function updateUserSpaceFilters()
 {
 	var x = Math.round(-photoLeft);
 	var y = Math.round(-photoTop);
+	if (svgMode) x = y = 0;
 
 	var xValues = [x, x - filterMarginX, x + divWidth - 1, x + divWidth];
 	var yValues = [y, y - filterMarginY, y + divHeight - 1, y + divHeight];
 
-	for (var f of userSpaceFilters)
+	for (var f of userSpaceFilters.values())
 		for (var [fe, x, y, w, h] of f)
 		{
 			if (x >= 0) fe.setAttribute('x', xValues[x]);
@@ -71,6 +128,7 @@ function resetUserSpaceFilters()
 {
 	var x = Math.round(-photoLeft);
 	var y = Math.round(-photoTop);
+	if (svgMode) x = y = 0;
 
 	filterMarginX = Math.round(divWidth / 10);
 	filterMarginY = Math.round(divHeight / 10);
@@ -81,7 +139,7 @@ function resetUserSpaceFilters()
 	var widths = [divWidth, divWidth + 2 * filterMarginX, filterMarginX];
 	var heights = [divHeight, divHeight + 2 * filterMarginY, filterMarginY];
 
-	for (var f of userSpaceFilters)
+	for (var f of userSpaceFilters.values())
 		for (var [fe, x, y, w, h] of f)
 		{
 			if (x >= 0) fe.setAttribute('x', xValues[x]);
@@ -110,36 +168,72 @@ function createChannelMask(channels, unfiltered)
 
 	return fe;
 }
-function createFilter(channels, fe)
+function createFilter(channels, feList, userSpaceElements)
 {
 	var filterId = svgFilterIdBin.length === 0 ? ++svgFilterId : svgFilterIdBin.pop();
 
-	var filterNode = document.createElementNS(svgNS, 'filter');
-	filterNode.setAttribute('id', 'filter' + filterId);
-	filterNode.setAttribute('color-interpolation-filters', 'sRGB');
-
-	if (Array.isArray(fe))
-		for (var i = 0; i < fe.length; ++i)
-			filterNode.appendChild(fe[i]);
-	else
-		for (var i = 1; i < arguments.length; ++i)
-			filterNode.appendChild(arguments[i]);
+	if (feList instanceof SVGElement)
+		feList = [feList];
 
 	if (channels > 0 && channels < 7)
 	{
-		filterNode.appendChild(createChannelMask(7 - channels, false));
-		filterNode.appendChild(createChannelMask(channels, true));
-
-		fe = document.createElementNS(svgNS, 'feComposite');
-		fe.setAttribute('in2', 'filtered');
-		fe.setAttribute('operator', 'arithmetic');
-		fe.setAttribute('k2', '1');
-		fe.setAttribute('k3', '1');
-		filterNode.appendChild(fe);
+		feList.push(createChannelMask(7 - channels, false));
+		feList.push(createChannelMask(channels, true));
+		feList.push(addFilters(null, 'filtered', null));
 	}
 
-	var svgNode = document.getElementById('svgRoot');
-	svgNode.firstChild.appendChild(filterNode);
+	if (!singleFilter) {
+		var filter = document.createElementNS(svgNS, 'filter');
+		filter.setAttribute('id', 'filter' + filterId);
+		filter.setAttribute('color-interpolation-filters', 'sRGB');
+		if (userSpaceElements) {
+			filter.setAttribute('filterUnits', 'userSpaceOnUse');
+			var i = (userSpaceElements.length === 0) ? 0 : 1;
+			userSpaceElements.unshift([filter, i, i, i, i]);
+			setUserSpaceElements(filterId, userSpaceElements);
+		}
+		for (var fe of feList)
+			filter.appendChild(fe);
+		document.getElementById('svgRoot').firstChild.appendChild(filter);
+		return filterId;
+	}
+
+	if (!svgFilter) {
+		svgFilter = document.createElementNS(svgNS, 'filter');
+		svgFilter.setAttribute('id', 'theFilter');
+		svgFilter.setAttribute('color-interpolation-filters', 'sRGB');
+		svgFilter.setAttribute('filterUnits', 'userSpaceOnUse');
+		document.getElementById('svgRoot').firstChild.appendChild(svgFilter);
+		setUserSpaceElements(svgFilter.id, [[svgFilter, 1, 1, 1, 1]]);
+	}
+
+	var lastElement = feList[feList.length - 1];
+	var prevElement;
+	var nextElement;
+	if (prevFilterId) {
+		prevElement = lastElementMap.get(prevFilterId);
+		nextElement = prevElement.nextSibling;
+		prevElement.setAttribute('result', 'FilterResult');
+		renameSourceGraphic(feList);
+	} else {
+		nextElement = svgFilter.firstChild;
+		renameSourceGraphic2(nextElement);
+	}
+	if (nextElement) {
+		lastElement.setAttribute('result', 'FilterResult');
+		for (var fe of feList)
+			svgFilter.insertBefore(fe, nextElement);
+	} else {
+		for (var fe of feList)
+			svgFilter.appendChild(fe);
+	}
+
+	firstElementMap.set(filterId, feList[0]);
+	lastElementMap.set(filterId, lastElement);
+
+	if (userSpaceElements)
+		setUserSpaceElements(filterId, userSpaceElements);
+
 	return filterId;
 }
 function matrixRow(a)
@@ -266,7 +360,7 @@ function createSVGThreshold(amount, channels)
 			fe2.appendChild(feFunc);
 		}
 
-	return createFilter(7, fe1, fe2);
+	return createFilter(7, [fe1, fe2]);
 }
 function createConvolveElement(kernel, order, inName, outName)
 {
@@ -330,6 +424,8 @@ function createSVGConvolve(value, channels, abs)
 }
 function createSVGPolar(value, channels, edgeMode, reverse)
 {
+	if (divWidth === undefined) return -1;
+
 	var info = {
 		radius: Polar.Radii[value],
 		reverse: reverse ? true : false,
@@ -340,11 +436,13 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	createPolarDisplacementMap(info);
 
 	var fe, feList = [];
+	var userSpaceElements = [];
 
 	fe = document.createElementNS(svgNS, 'feImage');
 	fe.setAttributeNS(xlinkNS, 'href', info.url1);
 	fe.setAttribute('result', 'map1');
 	feList.push(fe);
+	if (singleFilter) userSpaceElements.push([fe, 0, 0, 0, 0]);
 
 	fe = document.createElementNS(svgNS, 'feDisplacementMap');
 	fe.setAttribute('in', 'SourceGraphic');
@@ -353,6 +451,7 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	fe.setAttribute('xChannelSelector', 'R');
 	fe.setAttribute('yChannelSelector', 'G');
 	feList.push(fe);
+	if (singleFilter) userSpaceElements.push([fe, 0, 0, 0, 0]);
 
 	fe = document.createElementNS(svgNS, 'feComposite');
 	fe.setAttribute('in2', 'map1');
@@ -364,6 +463,7 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	fe.setAttributeNS(xlinkNS, 'href', info.url2);
 	fe.setAttribute('result', 'map2');
 	feList.push(fe);
+	if (singleFilter) userSpaceElements.push([fe, 0, 0, 0, 0]);
 
 	fe = document.createElementNS(svgNS, 'feDisplacementMap');
 	fe.setAttribute('in', 'SourceGraphic');
@@ -372,6 +472,7 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	fe.setAttribute('xChannelSelector', 'R');
 	fe.setAttribute('yChannelSelector', 'G');
 	feList.push(fe);
+	if (singleFilter) userSpaceElements.push([fe, 0, 0, 0, 0]);
 
 	fe = document.createElementNS(svgNS, 'feComposite');
 	fe.setAttribute('in2', 'map2');
@@ -383,9 +484,7 @@ function createSVGPolar(value, channels, edgeMode, reverse)
 	fe.setAttribute('in2', 'r1');
 	feList.push(fe);
 
-	var id = createFilter(channels, feList);
-	addUserSpaceFilter(id, 0, []);
-	return id;
+	return createFilter(channels, feList, userSpaceElements);
 }
 function createSVGReversePolar(value, channels, edgeMode)
 {
@@ -403,7 +502,6 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 	feList.push(fe);
 
 	f1.unshift(fe);
-	setUserSpaceElement(f1);
 	userSpace.push(f1);
 
 	fe = document.createElementNS(svgNS, 'feTile');
@@ -411,7 +509,6 @@ function dup(feList, mergeList, userSpace, result, f1, f2)
 	feList.push(fe);
 
 	f2.unshift(fe);
-	setUserSpaceElement(f2);
 	userSpace.push(f2);
 
 	mergeList.push(result);
@@ -455,12 +552,11 @@ function createMerge(feList, mergeList, userSpaceElements)
 	fe.setAttribute('result', 'image');
 	feList.push(fe);
 
-	fe = [fe, 0, 0, 0, 0];
-	setUserSpaceElement(fe);
-	userSpaceElements.push(fe);
+	userSpaceElements.push([fe, 0, 0, 0, 0]);
 	mergeList.push('image');
 
 	var feMerge = document.createElementNS(svgNS, 'feMerge');
+	feList.push(feMerge);
 
 	for (var inName of mergeList)
 	{
@@ -468,8 +564,6 @@ function createMerge(feList, mergeList, userSpaceElements)
 		feMergeNode.setAttribute('in', inName);
 		feMerge.appendChild(feMergeNode);
 	}
-
-	feList.push(feMerge);
 }
 function createSVGDBlur(radius, channels, edgeMode, isX)
 {
@@ -491,11 +585,12 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 		order = '1 ' + (radius + 1);
 	}
 
-	var fe, feList = [], userSpaceElements = [];
+	var fe, feList = [], userSpaceElements = null;
 
 	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
 	{
 		var mergeList = [];
+		userSpaceElements = [];
 
 		(isX ? (isLeft ? dupLeft : dupRight)
 			: (isLeft ? dupTop : dupBottom))(feList, mergeList, userSpaceElements);
@@ -507,9 +602,7 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 		fe = document.createElementNS(svgNS, 'feOffset');
 		feList.push(fe);
 
-		fe = [fe, 0, 0, 0, 0];
-		setUserSpaceElement(fe);
-		userSpaceElements.push(fe);
+		userSpaceElements = [[fe, 0, 0, 0, 0]];
 
 		fe = document.createElementNS(svgNS, 'feTile');
 		feList.push(fe);
@@ -531,10 +624,7 @@ function createSVGDBlur(radius, channels, edgeMode, isX)
 		feList.push(fe);
 	}
 
-	var id = createFilter(channels, feList);
-	if (userSpaceElements.length > 0)
-		addUserSpaceFilter(id, 1, userSpaceElements);
-	return id;
+	return createFilter(channels, feList, userSpaceElements);
 }
 function createSVGDBlurX(radius, channels, edgeMode)
 {
@@ -546,11 +636,12 @@ function createSVGDBlurY(radius, channels, edgeMode)
 }
 function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 {
-	var fe, feList = [], userSpaceElements = [];
+	var fe, feList = [], userSpaceElements = null;
 
 	if (edgeMode === 'duplicate' || edgeMode === 'mirror')
 	{
 		var mergeList = [];
+		userSpaceElements = [];
 		if (xRadius > 0) {
 			dupLeft(feList, mergeList, userSpaceElements);
 			dupRight(feList, mergeList, userSpaceElements);
@@ -572,9 +663,7 @@ function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 		fe = document.createElementNS(svgNS, 'feOffset');
 		feList.push(fe);
 
-		fe = [fe, 0, 0, 0, 0];
-		setUserSpaceElement(fe);
-		userSpaceElements.push(fe);
+		userSpaceElements = [[fe, 0, 0, 0, 0]];
 
 		fe = document.createElementNS(svgNS, 'feTile');
 		feList.push(fe);
@@ -586,10 +675,7 @@ function createGaussianBlur(xRadius, yRadius, channels, edgeMode)
 		fe.setAttribute('edgeMode', edgeMode);
 	feList.push(fe);
 
-	var id = createFilter(channels, feList);
-	if (userSpaceElements.length > 0)
-		addUserSpaceFilter(id, 1, userSpaceElements);
-	return id;
+	return createFilter(channels, feList, userSpaceElements);
 }
 function createBlurXFilter(xRadius, channels, edgeMode)
 {
@@ -655,9 +741,7 @@ function createTiltShift(blurRadius, channels)
 	fe.setAttribute('in2', 'SourceGraphic');
 	feList.push(fe);
 
-	var id = createFilter(channels, feList);
-	addUserSpaceFilter(id, 1, userSpaceElements);
-	return id;
+	return createFilter(channels, feList, userSpaceElements);
 }
 function svgCannotImplement(amount, channels)
 {
