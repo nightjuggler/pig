@@ -411,21 +411,36 @@ function releaseElement()
 }
 function photoDrag(event)
 {
-	var x = startX + event.clientX;
-	var y = startY + event.clientY;
+	var x, y;
+	if (!svgMode || rotateAngle === 0) {
+		x = startX + event.clientX;
+		y = startY + event.clientY;
+	} else if (rotateAngle === 90) {
+		x = startY + event.clientY;
+		y = startX - event.clientX;
+	} else if (rotateAngle === 180) {
+		x = startX - event.clientX;
+		y = startY - event.clientY;
+	} else {
+		x = startY - event.clientY;
+		y = startX + event.clientX;
+	}
 
 	var scaleX = divWidth / cropWidth;
 	var scaleY = divHeight / cropHeight;
 
-	var dW = (originalWidth - cropWidth) * scaleX;
-	var dH = (originalHeight - cropHeight) * scaleY;
+	var dW = Math.round((originalWidth - cropWidth) * scaleX);
+	var dH = Math.round((originalHeight - cropHeight) * scaleY);
 
-	var photoMinLeft = -dW;
-	var photoMaxLeft = 0;
-	var photoMinTop = -dH;
-	var photoMaxTop = 0;
+	var photoMinLeft, photoMinTop;
+	var photoMaxLeft, photoMaxTop;
 
-	if (rotateAngle === 90) {
+	if (rotateAngle === 0 || svgMode) {
+		photoMinLeft = -dW;
+		photoMaxLeft = 0;
+		photoMinTop = -dH;
+		photoMaxTop = 0;
+	} else if (rotateAngle === 90) {
 		photoMinLeft = 0;
 		photoMaxLeft = dH;
 		photoMinTop = -dW;
@@ -435,7 +450,7 @@ function photoDrag(event)
 		photoMaxLeft = dW;
 		photoMinTop = 0;
 		photoMaxTop = dH;
-	} else if (rotateAngle === 270) {
+	} else {
 		photoMinLeft = -dH;
 		photoMaxLeft = 0;
 		photoMinTop = 0;
@@ -457,7 +472,7 @@ function photoDrag(event)
 
 	var x2 = Math.round(x / scaleX);
 	var y2 = Math.round(y / scaleY);
-	if (rotateAngle === 0) {
+	if (rotateAngle === 0 || svgMode) {
 		photoLeft = x;
 		photoTop = y;
 		cropXField.value = -x2;
@@ -472,7 +487,7 @@ function photoDrag(event)
 		photoTop = -y;
 		cropXField.value = x2;
 		cropYField.value = y2;
-	} else if (rotateAngle === 270) {
+	} else {
 		photoLeft = -y;
 		photoTop = x;
 		cropXField.value = y2;
@@ -485,11 +500,24 @@ function photoDrag(event)
 function startPhotoDrag(event)
 {
 	if (svgMode) {
-		startX = svgImage.x.baseVal.value - event.clientX;
-		startY = svgImage.y.baseVal.value - event.clientY;
+		var x = svgImage.x.baseVal.value;
+		var y = svgImage.y.baseVal.value;
+		if (rotateAngle === 0) {
+			startX = x - event.clientX;
+			startY = y - event.clientY;
+		} else if (rotateAngle === 90) {
+			startX = y + event.clientX;
+			startY = x - event.clientY;
+		} else if (rotateAngle === 180) {
+			startX = x + event.clientX;
+			startY = y + event.clientY;
+		} else {
+			startX = y - event.clientX;
+			startY = x + event.clientY;
+		}
 	} else {
-		startX = photo.offsetLeft - event.clientX;
-		startY = photo.offsetTop - event.clientY;
+		startX = +photo.style.left.slice(0,-2) - event.clientX;
+		startY = +photo.style.top.slice(0,-2) - event.clientY;
 	}
 	document.onmousemove = photoDrag;
 	document.onmouseup = releaseElement;
@@ -521,7 +549,7 @@ function cropperDrag(event)
 		if (y2 > dH) y2 = dH;
 		cropXField.value = dW - x2;
 		cropYField.value = dH - y2;
-	} else if (rotateAngle === 270) {
+	} else {
 		if (x2 > dH) x2 = dH;
 		if (y2 > dW) y2 = dW;
 		cropXField.value = dW - y2;
@@ -830,10 +858,10 @@ function changeCropX()
 	setCropperXY();
 	if (cropped) {
 		photoLeft = Math.round(-x * divWidth / cropWidth);
-		if (rotateAngle === 0) setPhotoX(photoLeft);
+		if (rotateAngle === 0 || svgMode) setPhotoX(photoLeft);
 		else if (rotateAngle === 90) setPhotoY(photoLeft);
 		else if (rotateAngle === 180) setPhotoX(-photoLeft);
-		else if (rotateAngle === 270) setPhotoY(-photoLeft);
+		else setPhotoY(-photoLeft);
 		setSpecParam();
 	}
 }
@@ -850,10 +878,10 @@ function changeCropY()
 	setCropperXY();
 	if (cropped) {
 		photoTop = Math.round(-y * divHeight / cropHeight);
-		if (rotateAngle === 0) setPhotoY(photoTop);
+		if (rotateAngle === 0 || svgMode) setPhotoY(photoTop);
 		else if (rotateAngle === 90) setPhotoX(-photoTop);
 		else if (rotateAngle === 180) setPhotoY(-photoTop);
-		else if (rotateAngle === 270) setPhotoX(photoTop);
+		else setPhotoX(photoTop);
 		setSpecParam();
 	}
 }
@@ -937,43 +965,44 @@ function transformPhoto()
 	var photoWidth;
 	var photoHeight;
 	if (svgMode) {
-		photoWidth = svgImage.width.baseVal.value;
-		photoHeight = svgImage.height.baseVal.value;
+		photoWidth = divWidth;
+		photoHeight = divHeight;
 	} else {
 		photoWidth = photo.offsetWidth;
 		photoHeight = photo.offsetHeight;
 	}
 	var delta = (photoWidth - photoHeight) / 2;
-	var dX = 0;
-	var dY = 0;
-	var left = photoLeft;
-	var top = photoTop;
+	var dX, dY, left, top;
 
-	if (rotateAngle === 90) {
-		dX = delta;
-		dY = delta + photoHeight - divHeight;
-		left = -photoTop;
-		top = photoLeft;
-	} else if (rotateAngle === 180) {
-		dX = photoWidth - divWidth;
-		dY = photoHeight - divHeight;
-		left = -photoLeft;
-		top = -photoTop;
-	} else if (rotateAngle === 270) {
-		dX = -delta + photoWidth - divWidth;
-		dY = -delta;
-		left = photoTop;
-		top = -photoLeft;
-	}
-
-	if (rotateAngle !== 0) {
+	if (rotateAngle === 0) {
+		dX = 0;
+		dY = 0;
+		left = photoLeft;
+		top = photoTop;
+	} else {
+		if (rotateAngle === 90) {
+			dX = delta;
+			dY = delta + photoHeight - divHeight;
+			left = -photoTop;
+			top = photoLeft;
+		} else if (rotateAngle === 180) {
+			dX = photoWidth - divWidth;
+			dY = photoHeight - divHeight;
+			left = -photoLeft;
+			top = -photoTop;
+		} else {
+			dX = -delta + photoWidth - divWidth;
+			dY = -delta;
+			left = photoTop;
+			top = -photoLeft;
+		}
 		transform = "rotate(" + rotateAngle + "deg)";
 		transform += " translate(" + dX + "px," + dY + "px)";
 	}
 	if (svgMode) {
 		svgImage.parentNode.style.transform = transform;
-		svgImage.setAttribute('x', left);
-		svgImage.setAttribute('y', top);
+		svgImage.setAttribute('x', photoLeft);
+		svgImage.setAttribute('y', photoTop);
 	} else {
 		photo.style.transform = transform;
 		photo.style.left = left + 'px';
@@ -993,7 +1022,7 @@ function setCropperXY()
 	} else if (rotateAngle === 180) {
 		cropperLeft = photoMaxX - x - cropperWidth;
 		cropperTop = photoMaxY - y - cropperHeight;
-	} else if (rotateAngle === 270) {
+	} else {
 		cropperLeft = photoMinX + y;
 		cropperTop = photoMaxY - x - cropperHeight;
 	}
@@ -2139,8 +2168,6 @@ function replaceHTMLImgWithSVGImage()
 	svgImage = document.createElementNS(svgNS, 'image');
 	if (photoLoaded) {
 		svgImage.setAttributeNS(xlinkNS, 'href', photo.src);
-		svgImage.setAttribute('x', photo.style.left.slice(0, -2));
-		svgImage.setAttribute('y', photo.style.top.slice(0, -2));
 		svgImage.setAttribute('width', photo.offsetWidth);
 		svgImage.setAttribute('height', photo.offsetHeight);
 	}
@@ -2152,7 +2179,7 @@ function replaceHTMLImgWithSVGImage()
 		svgRoot.setAttribute('width', divWidth);
 		svgRoot.setAttribute('height', divHeight);
 		svgRoot.setAttribute('viewBox', [0, 0, divWidth, divHeight].join(' '));
-		svgRoot.style.transform = photo.style.transform;
+		transformPhoto();
 		svgRoot.style.cursor = photo.style.cursor;
 		svgRoot.onmousedown = photo.onmousedown;
 
@@ -2174,11 +2201,9 @@ function replaceSVGImageWithHTMLImg()
 	svgRoot.parentNode.replaceChild(photo, svgRoot);
 
 	if (photo.src !== "") {
-		photo.style.left = svgImage.getAttribute('x') + 'px';
-		photo.style.top = svgImage.getAttribute('y') + 'px';
 		photo.style.width = svgImage.getAttribute('width') + 'px';
 		photo.style.height = svgImage.getAttribute('height') + 'px';
-		photo.style.transform = svgRoot.style.transform;
+		transformPhoto();
 		photo.style.cursor = svgRoot.style.cursor;
 		photo.onmousedown = svgRoot.onmousedown;
 
@@ -2733,6 +2758,7 @@ function documentKeyDown(event)
 {
 	if (event.target instanceof HTMLInputElement ||
 		event.target instanceof HTMLSelectElement) return true;
+	if (document.onmousemove) return true;
 
 	var key = event.key || event.keyIdentifier;
 
