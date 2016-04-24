@@ -1141,7 +1141,7 @@ function createPolarDisplacementMap(info)
 	var width = info.width;
 	var height = info.height;
 	info.scale1 = 2 * Math.max(width, height);
-	info.scale2 = info.scale1 / 3;
+	info.scale2 = Math.round(info.scale1 / 3);
 	var scale1 = info.scale1;
 	var scale2 = info.scale2;
 	var halfScale2 = scale2 / 2;
