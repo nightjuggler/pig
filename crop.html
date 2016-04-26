@@ -1285,6 +1285,12 @@ function imageFailedLoad(event)
 {
 	hideLoading();
 
+	if (queryString.crossOrigin) {
+		queryString.crossOrigin = false;
+		loadImage();
+		return;
+	}
+
 	var fileNameField = document.getElementById("fileNameField");
 	var selectedIndex = fileNameField.selectedIndex;
 
@@ -1350,6 +1356,8 @@ function loadImage()
 		imageObject.addEventListener("load", imageLoaded, false);
 	}
 	imageObject.addEventListener("error", imageFailedLoad, false);
+	if (queryString.crossOrigin)
+		imageObject.crossOrigin = "anonymous";
 	if (imageFiles === undefined)
 		imageObject.src = imagePath + imageName;
 	else
@@ -2573,6 +2581,7 @@ function parseQueryString()
 		cropGeometry: null,
 		rotateAngle: 0,
 		inverseAspectRatio: false,
+		crossOrigin: false,
 	};
 
 	var q = window.location.search;
@@ -2587,6 +2596,10 @@ function parseQueryString()
 		}
 		if (s === 'iar') {
 			queryString.inverseAspectRatio = true;
+			continue;
+		}
+		if (s === 'cors') {
+			queryString.crossOrigin = true;
 			continue;
 		}
 		var i = s.indexOf('=');
