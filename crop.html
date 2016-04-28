@@ -389,6 +389,7 @@ var oldDivWidth;
 var oldDivHeight;
 
 var svgImage, svgMode = false;
+var ModeFlags = {SingleFilter: 1, SVGImage: 2, Video: 4};
 var videoExtensions = ['m4v', 'mov', 'mp4', 'mpeg', 'mpg', 'ogg', 'ogv', 'webm'];
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
@@ -1220,10 +1221,25 @@ function imageLoaded(event)
 		disableCropElements(false);
 
 	var isVideo = event.target instanceof HTMLVideoElement;
-	if (isVideo && svgMode) {
-		document.getElementById("modeSelect").selectedIndex = 2;
-		changeMode();
+	var modeSelect = document.getElementById("modeSelect");
+	if (isVideo) {
+		if (svgMode) {
+			modeSelect.selectedIndex = 4;
+			changeMode();
+		} else if (modeSelect.selectedIndex === 1) {
+			modeSelect.selectedIndex = 3;
+		} else if (modeSelect.selectedIndex === 2) {
+			modeSelect.selectedIndex = 4;
+		}
+	} else {
+		if (modeSelect.selectedIndex === 3)
+			modeSelect.selectedIndex = 1;
+		else if (modeSelect.selectedIndex === 4)
+			modeSelect.selectedIndex = 2;
 	}
+	var options = modeSelect.options;
+	for (var i = 0; i < options.length; ++i)
+		options[i].disabled = ((options[i].value & ModeFlags.Video) === 0) === isVideo;
 
 	var oldPhoto = photo;
 	photo = event.target;
@@ -2058,8 +2074,9 @@ function showFilterCode(event)
 
 	var svgRoot = document.getElementById('svgRoot');
 	var svg = 'svg';
-	for (var name of ['width', 'height', 'xmlns', 'xmlns:xlink'])
-		svg += ' ' + name + '="' + svgRoot.getAttribute(name) + '"';
+	for (var name of ['width', 'height', 'viewBox', 'xmlns', 'xmlns:xlink'])
+		if (svgRoot.hasAttribute(name))
+			svg += ' ' + name + '="' + svgRoot.getAttribute(name) + '"';
 	svg = '&lt;' + markupTag(svg)[1] + '&gt;';
 
 	var j = 0;
@@ -2270,8 +2287,8 @@ function changeMode()
 {
 	var mode = +document.getElementById('modeSelect').value;
 
-	var _svgMode = (mode & 2) !== 0;
-	var _singleFilter = (mode & 1) !== 0;
+	var _svgMode = (mode & ModeFlags.SVGImage) !== 0;
+	var _singleFilter = (mode & ModeFlags.SingleFilter) !== 0;
 
 	if (svgMode !== _svgMode) {
 		svgMode = _svgMode;
@@ -2980,7 +2997,9 @@ Crop Inverse Aspect Ratio
 <div id="filterDiv"><div><span style="margin: 2px;">Mode:</span><select id="modeSelect">
 <option value="3">SVG &lt;image&gt;</option>
 <option value="0">HTML &lt;img&gt;</option>
-<option value="1">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</option></select></div></div>
+<option value="1">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</option>
+<option value="4">HTML &lt;video&gt;</option>
+<option value="5">HTML &lt;video&gt; + 1 SVG &lt;filter&gt;</option></select></div></div>
 </div>
 <div id="convolveInfoDiv">
 <b>Convolution Kernels</b>
@@ -3030,7 +3049,12 @@ Crop Inverse Aspect Ratio
 <tr><td> </td><td> 1 -4  1</td><td> </td></tr>
 <tr><td> </td><td> 0  1  0</td><td> </td></tr>
 </table></td>
-<td></td>
+<td>Edge Detect 3
+<table class="kernel">
+<tr><td> </td><td> 1   -1   1</td><td> </td></tr>
+<tr><td> </td><td>-1 -0.01 -1</td><td> </td></tr>
+<tr><td> </td><td> 1   -1   1</td><td> </td></tr>
+</table></td>
 </tr>
 <tr>
 <td>Emboss 1
