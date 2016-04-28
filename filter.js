@@ -743,10 +743,6 @@ function createTiltShift(blurRadius, channels)
 
 	return createFilter(channels, feList, userSpaceElements);
 }
-function svgCannotImplement(amount, channels)
-{
-	return -1;
-}
 var BlurFlags = {
 	xDirectional: 0b00000001,
 	yDirectional: 0b00000010,
@@ -1603,6 +1599,7 @@ new Convolution('prewitt x',     [-1,  0,  1, -1,  0,  1, -1,  0,  1]),
 new Convolution('prewitt y',     [-1, -1, -1,  0,  0,  0,  1,  1,  1]),
 new Convolution('edge detect 1', [-1, -1, -1, -1,  8, -1, -1, -1, -1]),
 new Convolution('edge detect 2', [ 0,  1,  0,  1, -4,  1,  0,  1,  0]),
+new Convolution('edge detect 3', [ 1, -1,  1, -1,-.01,-1,  1, -1,  1]),
 new Convolution('emboss 1',      [ 1,  0,  0,  0,  0,  0,  0,  0, -1]),
 new Convolution('emboss 2',      [-2, -1,  0, -1,  1,  1,  0,  1,  2]),
 new Convolution('emboss 3',      [-2, -2,  0, -2,  6,  0,  0,  0,  0]),
