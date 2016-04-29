@@ -2917,8 +2917,10 @@ function manageUserSpaceFilters()
 			updateFilters = true;
 		}
 	}
-	if (updateFilters)
+	if (updateFilters) {
 		applyFilters();
+		if (foreignObject) setTimeout(updateUserSpaceFilters, 500);
+	}
 }
 function documentKeyDown(event)
 {
