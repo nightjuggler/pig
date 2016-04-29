@@ -1537,6 +1537,11 @@ function convolve3x3(context, inData, channels, kernel, abs)
 			var b = k8*s[i8+2] + k7*s[i7+2] + k6*s[i6+2] +
 				k5*s[i5+2] + k4*s[i +2] + k3*s[i3+2] +
 				k2*s[i2+2] + k1*s[i1+2] + k0*s[i0+2];
+			if (sumOfWeights !== 1) {
+				r /= sumOfWeights;
+				g /= sumOfWeights;
+				b /= sumOfWeights;
+			}
 			if (abs) {
 				r = Math.abs(r);
 				g = Math.abs(g);
