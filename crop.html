@@ -3035,7 +3035,11 @@ function bodyLoaded()
 	document.getElementById("modeSelect").addEventListener("change", changeMode, false);
 	document.addEventListener("keydown", documentKeyDown, false);
 
-	setMode(ModeFlags.SingleFilter | ModeFlags.ForeignObject);
+	var userAgent = navigator.userAgent;
+	if (userAgent.indexOf(" Firefox/") > 0 || userAgent.indexOf(" Chrome/") > 0)
+		setMode(ModeFlags.SingleFilter);
+	else
+		setMode(ModeFlags.SingleFilter | ModeFlags.SVGImage);
 	changeMode();
 	loadImage();
 }
