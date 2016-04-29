@@ -490,10 +490,6 @@ function photoDrag(event)
 	}
 
 	if (!svgMode) updateUserSpaceFilters();
-	if (foreignObject && svgFilter) {
-		svgFilter.id = svgFilter.id === 'theFilter' ? 'theFilter2' : 'theFilter';
-		svgImage.setAttribute('filter', 'url(#' + svgFilter.id + ')');
-	}
 	return false;
 }
 function startPhotoDrag(event)
@@ -1059,6 +1055,7 @@ function turnPhotoDiv(swap)
 }
 function rotatePhoto(angle)
 {
+	if (imageNames === undefined) return;
 	rotateAngle = (rotateAngle + angle) % 360;
 	transformPhoto();
 	var oldCropperLeft = cropperLeft - photoMinX;
@@ -2058,7 +2055,7 @@ function getURL()
 
 	url = url.protocol + '//' + url.host + url.pathname;
 	url += '?f=' + filterList.join('/');
-	if (imageFiles === undefined) {
+	if (imageFiles === undefined && imageNames !== undefined) {
 		if (cropped)
 			url += '&c=' + cropWidth + 'x' + cropHeight + '+'
 				+ cropXField.value + '+' + cropYField.value;
@@ -2171,6 +2168,9 @@ function applyFiltersSVG()
 		if (filter.id > 0)
 			prevFilterId = filter.id;
 	}
+	if (foreignObject && svgFilter)
+		svgFilter.id = svgFilter.id === 'theFilter' ? 'theFilter2' : 'theFilter';
+
 	var filter = prevFilterId > 0 ? 'url(#' + svgFilter.id + ')' : 'none';
 	if (svgImage) {
 		if (prevFilterId > 0)

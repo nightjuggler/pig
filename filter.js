@@ -123,6 +123,11 @@ function updateUserSpaceFilters()
 			if (x >= 0) fe.setAttribute('x', xValues[x]);
 			if (y >= 0) fe.setAttribute('y', yValues[y]);
 		}
+
+	if (foreignObject && svgFilter) {
+		svgFilter.id = svgFilter.id === 'theFilter' ? 'theFilter2' : 'theFilter';
+		svgImage.setAttribute('filter', 'url(#' + svgFilter.id + ')');
+	}
 }
 function resetUserSpaceFilters()
 {
