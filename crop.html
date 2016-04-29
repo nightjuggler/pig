@@ -388,8 +388,8 @@ var showCropGeometry;
 var oldDivWidth;
 var oldDivHeight;
 
-var svgImage, svgMode = false;
-var ModeFlags = {SingleFilter: 1, SVGImage: 2, Video: 4};
+var svgImage, svgMode = false, foreignObject = false;
+var ModeFlags = {SingleFilter: 1, SVGImage: 2, Video: 4, ForeignObject: 8};
 var videoExtensions = ['m4v', 'mov', 'mp4', 'mpeg', 'mpg', 'ogg', 'ogv', 'webm'];
 
 var downloadBlobURL = true;      // if true, create a blob: URL / if false, create a data: URL
@@ -698,11 +698,10 @@ function setDisplayArea()
 	photoMaxX = photoDiv.offsetLeft + photoDiv.offsetWidth - 4;
 	photoMaxY = photoDiv.offsetTop + photoDiv.offsetHeight - 4;
 
+	setPhotoWidthHeight(divWidth, divHeight);
 	if (svgMode) {
 		svgImage.setAttribute('x', 0);
 		svgImage.setAttribute('y', 0);
-		svgImage.setAttribute('width', divWidth);
-		svgImage.setAttribute('height', divHeight);
 		var svgRoot = svgImage.parentNode;
 		svgRoot.setAttribute('width', divWidth);
 		svgRoot.setAttribute('height', divHeight);
@@ -713,8 +712,6 @@ function setDisplayArea()
 	} else {
 		photo.style.left = '0px';
 		photo.style.top = '0px';
-		photo.style.width = divWidth + 'px';
-		photo.style.height = divHeight + 'px';
 		photo.style.transform = 'none';
 		photo.style.cursor = 'default';
 		photo.onmousedown = preventDefault;
@@ -847,6 +844,21 @@ function setPhotoY(y)
 	else
 		photo.style.top = y + 'px';
 }
+function setPhotoWidthHeight(width, height)
+{
+	if (svgMode) {
+		svgImage.setAttribute('width', width);
+		svgImage.setAttribute('height', height);
+	} else {
+		photo.style.width = width + 'px';
+		photo.style.height = height + 'px';
+		if (foreignObject) {
+			var imgStyle = svgImage.firstChild.style;
+			imgStyle.width = photo.style.width;
+			imgStyle.height = photo.style.height;
+		}
+	}
+}
 function changeCropX()
 {
 	var x = +cropXField.value;
@@ -909,14 +921,7 @@ function crop()
 	photoLeft = Math.round(-cropXField.value * scaleX);
 	photoTop = Math.round(-cropYField.value * scaleY);
 
-	if (svgMode) {
-		svgImage.setAttribute('width', width);
-		svgImage.setAttribute('height', height);
-	} else {
-		photo.style.width = width + 'px';
-		photo.style.height = height + 'px';
-	}
-
+	setPhotoWidthHeight(width, height);
 	transformPhoto();
 	setSpecParam();
 
@@ -939,14 +944,7 @@ function undo()
 	photoLeft = 0;
 	photoTop = 0;
 
-	if (svgMode) {
-		svgImage.setAttribute('width', divWidth);
-		svgImage.setAttribute('height', divHeight);
-	} else {
-		photo.style.width = divWidth + 'px';
-		photo.style.height = divHeight + 'px';
-	}
-
+	setPhotoWidthHeight(divWidth, divHeight);
 	transformPhoto();
 	setCropperXY();
 	manageUserSpaceFilters();
@@ -970,8 +968,8 @@ function transformPhoto()
 		photoWidth = divWidth;
 		photoHeight = divHeight;
 	} else {
-		photoWidth = photo.offsetWidth;
-		photoHeight = photo.offsetHeight;
+		photoWidth = +photo.style.width.slice(0,-2);
+		photoHeight = +photo.style.height.slice(0,-2);
 	}
 	var delta = (photoWidth - photoHeight) / 2;
 	var dX, dY, left, top;
@@ -1214,55 +1212,66 @@ function hideFailed()
 {
 	document.getElementById("failedDiv").style.display = "none";
 }
-function imageLoaded(event)
+function setMode(newMode)
 {
-	if (cropped) undo();
-	else if (photo.src === "")
-		disableCropElements(false);
-
-	var isVideo = event.target instanceof HTMLVideoElement;
 	var modeSelect = document.getElementById("modeSelect");
-	if (isVideo) {
-		if (svgMode) {
-			modeSelect.selectedIndex = 4;
-			changeMode();
-		} else if (modeSelect.selectedIndex === 1) {
-			modeSelect.selectedIndex = 3;
-		} else if (modeSelect.selectedIndex === 2) {
-			modeSelect.selectedIndex = 4;
-		}
-	} else {
-		if (modeSelect.selectedIndex === 3)
-			modeSelect.selectedIndex = 1;
-		else if (modeSelect.selectedIndex === 4)
-			modeSelect.selectedIndex = 2;
-	}
+	var videoMode = newMode & ModeFlags.Video;
+	var modeIndex = {};
+
 	var options = modeSelect.options;
 	for (var i = 0; i < options.length; ++i)
-		options[i].disabled = ((options[i].value & ModeFlags.Video) === 0) === isVideo;
+	{
+		var option = options[i];
+		option.disabled = (option.value & ModeFlags.Video) !== videoMode;
+		modeIndex[option.value] = i;
+	}
 
-	var oldPhoto = photo;
-	photo = event.target;
+	modeSelect.selectedIndex = modeIndex[newMode];
+}
+function imageLoaded(event)
+{
+	var oldPhoto = foreignObject ? svgImage.firstChild : photo;
+	var newPhoto = event.target;
 
-	photo.removeEventListener(isVideo ? "canplay" : "load", imageLoaded, false);
-	photo.removeEventListener("error", imageFailedLoad, false);
-	photo.style.position = "absolute";
+	var isVideo = newPhoto instanceof HTMLVideoElement;
+	var mode = +document.getElementById("modeSelect").value;
+
+	newPhoto.removeEventListener(isVideo ? "canplay" : "load", imageLoaded, false);
+	newPhoto.removeEventListener("error", imageFailedLoad, false);
+
+	if (cropped) undo();
+	else if (oldPhoto.src === "")
+		disableCropElements(false);
 
 	if (isVideo) {
-		originalWidth = photo.videoWidth;
-		originalHeight = photo.videoHeight;
+		if (svgMode) {
+			setMode(ModeFlags.Video | ModeFlags.SingleFilter);
+			changeMode();
+		} else if (!(mode & ModeFlags.Video))
+			setMode(ModeFlags.Video | mode);
+
+		originalWidth = newPhoto.videoWidth;
+		originalHeight = newPhoto.videoHeight;
 	} else {
-		originalWidth = photo.naturalWidth;
-		originalHeight = photo.naturalHeight;
+		if (mode & ModeFlags.Video)
+			setMode(mode - ModeFlags.Video);
+
+		originalWidth = newPhoto.naturalWidth;
+		originalHeight = newPhoto.naturalHeight;
 	}
 
-	if (svgMode)
-		svgImage.setAttributeNS(xlinkNS, "href", photo.src);
-	else {
-		oldPhoto.parentNode.replaceChild(photo, oldPhoto);
-		photo.style.webkitFilter = oldPhoto.style.webkitFilter;
-		photo.style.filter = oldPhoto.style.filter;
+	if (!foreignObject) {
+		photo = newPhoto;
+		photo.style.position = "absolute";
+		if (!svgMode) {
+			photo.style.webkitFilter = oldPhoto.style.webkitFilter;
+			photo.style.filter = oldPhoto.style.filter;
+		}
 	}
+	if (svgMode)
+		svgImage.setAttributeNS(xlinkNS, "href", newPhoto.src);
+	else
+		oldPhoto.parentNode.replaceChild(newPhoto, oldPhoto);
 
 	if (oldPhoto.src.substr(0, 5) === "blob:")
 		URL.revokeObjectURL(oldPhoto.src);
@@ -1395,7 +1404,9 @@ function nextImage()
 }
 function drawCanvas()
 {
-	if (photo.src === "") return null;
+	var thePhoto = foreignObject ? svgImage.firstChild : photo;
+	if (thePhoto.src === "") return null;
+	if (thePhoto instanceof HTMLVideoElement && !thePhoto.paused) thePhoto.pause();
 
 	if (hiddenCanvas === undefined)
 		hiddenCanvas = document.createElement("canvas");
@@ -1406,10 +1417,10 @@ function drawCanvas()
 	var context = hiddenCanvas.getContext("2d");
 
 	if (cropped)
-		context.drawImage(photo, +cropXField.value, +cropYField.value,
+		context.drawImage(thePhoto, +cropXField.value, +cropYField.value,
 			cropWidth, cropHeight, 0, 0, divWidth, divHeight);
 	else
-		context.drawImage(photo, 0, 0, divWidth, divHeight);
+		context.drawImage(thePhoto, 0, 0, divWidth, divHeight);
 
 	var imageData;
 	try {
@@ -2073,10 +2084,14 @@ function showFilterCode(event)
 		';\n<span class="cT">filter</span>: ' + filterStyle + ';\n';
 
 	var svgRoot = document.getElementById('svgRoot');
+	var attributes = svgRoot.attributes;
 	var svg = 'svg';
-	for (var name of ['width', 'height', 'viewBox', 'xmlns', 'xmlns:xlink'])
-		if (svgRoot.hasAttribute(name))
-			svg += ' ' + name + '="' + svgRoot.getAttribute(name) + '"';
+	for (var j = 0; j < attributes.length; ++j)
+	{
+		var attr = attributes[j];
+		if (attr.name !== 'id')
+			svg += ' ' + attr.name + '="' + attr.value + '"';
+	}
 	svg = '&lt;' + markupTag(svg)[1] + '&gt;';
 
 	var j = 0;
@@ -2096,6 +2111,7 @@ function showFilterCode(event)
 			--indent;
 			if  (tag !== previousTag) {
 				svg += '\n';
+				if (previousTag === 'img') --indent;
 				for (k = 0; k < indent; ++k) svg += '  ';
 			}
 			svg += '&lt;/' + tagData + '&gt;';
@@ -2160,8 +2176,7 @@ function applyFiltersSVG()
 			prevFilterId = filter.id;
 	}
 	var filter = prevFilterId > 0 ? 'url(#' + svgFilter.id + ')' : 'none';
-	if (svgMode) {
-		if (!svgImage) return;
+	if (svgImage) {
 		if (prevFilterId > 0)
 			svgImage.setAttribute('filter', filter);
 		else
@@ -2226,9 +2241,12 @@ function toggleSingleFilter()
 }
 function replaceHTMLImgWithSVGImage()
 {
-	var photoLoaded = (photo.src !== "");
+	if (foreignObject) {
+		detachForeignObject();
+		foreignObject = false;
+	}
 
-	var svgRoot = document.getElementById('svgRoot');
+	var photoLoaded = (photo.src !== "");
 
 	svgImage = document.createElementNS(svgNS, 'image');
 	if (photoLoaded) {
@@ -2237,6 +2255,7 @@ function replaceHTMLImgWithSVGImage()
 		svgImage.setAttribute('height', photo.offsetHeight);
 	}
 
+	var svgRoot = document.getElementById('svgRoot');
 	svgRoot.appendChild(svgImage);
 	photo.parentNode.replaceChild(svgRoot, photo);
 
@@ -2252,13 +2271,13 @@ function replaceHTMLImgWithSVGImage()
 		photo.style.top = '0px';
 		photo.style.width = divWidth + 'px';
 		photo.style.height = divHeight + 'px';
-		photo.style.transform = 'none';
-		photo.style.cursor = 'default';
+		photo.style.removeProperty('transform');
+		photo.style.removeProperty('cursor');
 		photo.onmousedown = null;
 	}
 
-	photo.style.webkitFilter = 'none';
-	photo.style.filter = 'none';
+	photo.style.removeProperty('-webkit-filter');
+	photo.style.removeProperty('filter');
 }
 function replaceSVGImageWithHTMLImg()
 {
@@ -2275,12 +2294,85 @@ function replaceSVGImageWithHTMLImg()
 		svgRoot.setAttribute('width', 0);
 		svgRoot.setAttribute('height', 0);
 		svgRoot.removeAttribute('viewBox');
-		svgRoot.style.transform = 'none';
-		svgRoot.style.cursor = 'default';
+		svgRoot.style.removeProperty('transform');
+		svgRoot.style.removeProperty('cursor');
 		svgRoot.onmousedown = null;
+		if (svgRoot.style.length === 0) svgRoot.removeAttribute('style');
 	}
 
 	svgRoot.removeChild(svgImage);
+	svgImage = null;
+	document.body.appendChild(svgRoot);
+}
+function attachForeignObject()
+{
+	var svgRoot = document.getElementById('svgRoot');
+
+	photo.parentNode.replaceChild(svgRoot, photo);
+
+	svgRoot.removeAttribute('width');
+	svgRoot.removeAttribute('height');
+	svgRoot.style.position = 'absolute';
+
+	if (photo.src !== "") {
+		svgRoot.style.left = photo.style.left;
+		svgRoot.style.top = photo.style.top;
+		svgRoot.style.width = photo.style.width;
+		svgRoot.style.height = photo.style.height;
+		svgRoot.style.transform = photo.style.transform;
+		svgRoot.style.cursor = photo.style.cursor;
+		svgRoot.onmousedown = photo.onmousedown;
+
+		photo.style.removeProperty('left');
+		photo.style.removeProperty('top');
+		photo.style.removeProperty('transform');
+		photo.style.removeProperty('cursor');
+		photo.onmousedown = null;
+	}
+
+	photo.style.removeProperty('position');
+	photo.style.removeProperty('-webkit-filter');
+	photo.style.removeProperty('filter');
+
+	svgImage = document.createElementNS(svgNS, 'foreignObject');
+	svgImage.setAttribute('width', '100%');
+	svgImage.setAttribute('height', '100%');
+	svgImage.appendChild(photo);
+
+	svgRoot.appendChild(svgImage);
+	photo = svgRoot;
+}
+function detachForeignObject()
+{
+	var svgRoot = photo;
+	photo = svgImage.firstChild;
+	svgRoot.parentNode.replaceChild(photo, svgRoot);
+
+	photo.style.position = 'absolute';
+	svgRoot.style.removeProperty('position');
+
+	if (photo.src !== "") {
+		photo.style.left = svgRoot.style.left;
+		photo.style.top = svgRoot.style.top;
+		photo.style.transform = svgRoot.style.transform;
+		photo.style.cursor = svgRoot.style.cursor;
+		photo.onmousedown = svgRoot.onmousedown;
+
+		svgRoot.style.removeProperty('left');
+		svgRoot.style.removeProperty('top');
+		svgRoot.style.removeProperty('width');
+		svgRoot.style.removeProperty('height');
+		svgRoot.style.removeProperty('transform');
+		svgRoot.style.removeProperty('cursor');
+		svgRoot.onmousedown = null;
+	}
+
+	if (svgRoot.style.length === 0) svgRoot.removeAttribute('style');
+	svgRoot.setAttribute('width', 0);
+	svgRoot.setAttribute('height', 0);
+
+	svgRoot.removeChild(svgImage);
+	svgImage = null;
 	document.body.appendChild(svgRoot);
 }
 function changeMode()
@@ -2289,6 +2381,7 @@ function changeMode()
 
 	var _svgMode = (mode & ModeFlags.SVGImage) !== 0;
 	var _singleFilter = (mode & ModeFlags.SingleFilter) !== 0;
+	var _foreignObject = (mode & ModeFlags.ForeignObject) !== 0;
 
 	if (svgMode !== _svgMode) {
 		svgMode = _svgMode;
@@ -2298,6 +2391,13 @@ function changeMode()
 			replaceSVGImageWithHTMLImg();
 		if (singleFilter && _singleFilter && filterMarginX !== undefined)
 			updateUserSpaceFilters();
+	}
+	if (foreignObject !== _foreignObject) {
+		foreignObject = _foreignObject;
+		if (foreignObject)
+			attachForeignObject();
+		else
+			detachForeignObject();
 	}
 	if (singleFilter !== _singleFilter)
 		toggleSingleFilter();
@@ -2854,11 +2954,10 @@ function documentKeyDown(event)
 		if (document.getElementById("canvas").style.display === 'block')
 			drawCanvas();
 	} else if (key === ' ' || key === 'U+0020') {
-		if (photo instanceof HTMLVideoElement) {
-			if (photo.paused)
-				photo.play();
-			else
-				photo.pause();
+		if (document.getElementById('canvas').style.display !== 'block') {
+			var thePhoto = foreignObject ? svgImage.firstChild : photo;
+			if (thePhoto instanceof HTMLVideoElement)
+				thePhoto.paused ? thePhoto.play() : thePhoto.pause();
 		}
 	} else
 		return true;
@@ -2939,6 +3038,8 @@ function bodyLoaded()
 	document.getElementById("overlayCanvasLink").addEventListener("click", overlayCanvas, false);
 	document.getElementById("modeSelect").addEventListener("change", changeMode, false);
 	document.addEventListener("keydown", documentKeyDown, false);
+
+	setMode(ModeFlags.SingleFilter | ModeFlags.ForeignObject);
 	changeMode();
 	loadImage();
 }
@@ -2998,8 +3099,10 @@ Crop Inverse Aspect Ratio
 <option value="3">SVG &lt;image&gt;</option>
 <option value="0">HTML &lt;img&gt;</option>
 <option value="1">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</option>
+<option value="9">&lt;foreignObject&gt; + &lt;img&gt;</option>
 <option value="4">HTML &lt;video&gt;</option>
-<option value="5">HTML &lt;video&gt; + 1 SVG &lt;filter&gt;</option></select></div></div>
+<option value="5">HTML &lt;video&gt; + 1 SVG &lt;filter&gt;</option>
+<option value="13">&lt;foreignObject&gt; + &lt;video&gt;</option></select></div></div>
 </div>
 <div id="convolveInfoDiv">
 <b>Convolution Kernels</b>
@@ -3091,11 +3194,11 @@ Note that <span class="action">Overlay Canvas</span> and <span class="action">Sa
 only work if the image you're viewing is either served from the same origin as this page or if
 the image was selected via <span class="action">Browse Files</span>. <span class="action">Overlay
 Canvas</span> and <span class="action">Save</span> will draw the image into an HTML canvas, get
-the image data from the canvas (which the browser will not allow for cross-origin images), apply
-the filter operations to the image data, and draw the image data back to the canvas.
+the image data from the canvas (which the browser won't allow for cross-origin images), apply the
+filter operations to the image data, and draw the image data back to the canvas.
 <br><br>
-For best results in Chrome, use mode <span class="action">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</span>.
-For best results in Safari, use mode <span class="action">SVG &lt;image&gt;</span>.
+For best results in Chrome, try mode <span class="action">HTML &lt;img&gt; + 1 SVG &lt;filter&gt;</span>.
+For best results in Safari, try mode <span class="action">SVG &lt;image&gt;</span>.
 All modes seem to work equally well in Firefox.
 </div>
 <div style="text-align: center;"><input type="button" value="Close" onclick="hideAbout()" /></div>
