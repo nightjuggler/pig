@@ -1104,9 +1104,6 @@ function toggleInverseAspectRatio()
 	cropInverseAspectRatio = !cropInverseAspectRatio;
 
 	if (cropInverseAspectRatio) {
-		minWidth = divHeight;
-		minHeight = divWidth;
-
 		if (originalWidth > originalHeight) {
 			maxWidth = Math.floor(originalHeight / aspectX * aspectY);
 			maxHeight = originalHeight;
@@ -1115,17 +1112,12 @@ function toggleInverseAspectRatio()
 			maxHeight = Math.floor(originalWidth / aspectY * aspectX);
 		}
 	} else {
-		minWidth = divWidth;
 		maxWidth = originalWidth;
-
-		minHeight = divHeight;
 		maxHeight = originalHeight;
 	}
 
-	var x = aspectX;
-	var y = aspectY;
-	aspectX = y;
-	aspectY = x;
+	var w = minWidth; minWidth = minHeight; minHeight = w; // Swap minWidth and minHeight
+	var x = aspectX; aspectX = aspectY; aspectY = x; // Swap aspectX and aspectY
 
 	if (originalWidth > originalHeight)
 		setCropHeight(cropWidth);
