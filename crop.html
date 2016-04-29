@@ -2168,9 +2168,6 @@ function applyFiltersSVG()
 		if (filter.id > 0)
 			prevFilterId = filter.id;
 	}
-	if (foreignObject && svgFilter)
-		svgFilter.id = svgFilter.id === 'theFilter' ? 'theFilter2' : 'theFilter';
-
 	var filter = prevFilterId > 0 ? 'url(#' + svgFilter.id + ')' : 'none';
 	if (svgImage) {
 		if (prevFilterId > 0)
