@@ -65,7 +65,7 @@ function removeSVGFilter(id)
 			if (prev) prev.removeAttribute('result');
 		else {
 			resetFilterId = true;
-			userSpaceFilters.delete(svgFilter.id);
+			userSpaceFilters.delete(0);
 			svgFilter.parentNode.removeChild(svgFilter);
 			svgFilter = null;
 		}
@@ -204,7 +204,7 @@ function createFilter(channels, feList, userSpaceElements)
 		svgFilter.setAttribute('color-interpolation-filters', 'sRGB');
 		svgFilter.setAttribute('filterUnits', 'userSpaceOnUse');
 		document.getElementById('svgRoot').firstChild.appendChild(svgFilter);
-		setUserSpaceElements(svgFilter.id, [[svgFilter, 1, 1, 1, 1]]);
+		setUserSpaceElements(0, [[svgFilter, 1, 1, 1, 1]]);
 	}
 
 	var lastElement = feList[feList.length - 1];

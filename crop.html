@@ -490,6 +490,10 @@ function photoDrag(event)
 	}
 
 	if (!svgMode) updateUserSpaceFilters();
+	if (foreignObject && svgFilter) {
+		svgFilter.id = svgFilter.id === 'theFilter' ? 'theFilter2' : 'theFilter';
+		svgImage.setAttribute('filter', 'url(#' + svgFilter.id + ')');
+	}
 	return false;
 }
 function startPhotoDrag(event)
