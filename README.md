@@ -1,17 +1,22 @@
-# PIG &amp; PIE &mdash; P's Image Gallery &amp; P's Image Editor
+# PIG &amp; PIE
 
 The first version of **pig** was written in May 2008, partly inspired by Max P's **lightbox**.
 
-**pig** consists of two main components: **pig.py** and **pie.html**:
+**pig** consists of two main components: **pig.py** and **pie.html**.
+
+## PIG (Pius' Image Gallery)
 
 **pig.py** is a Python script that will (1) create resized (and
 cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs)
 according to **spec.py** and (2) create HTML pages for a gallery /
-photo album containing those images.
+photo album containing those images (**index_template.html** and
+**page_template.html** are used as templates for the HTML pages).
 **pig.py** uses [ImageMagick](https://www.imagemagick.org/)'s
 [convert](https://www.imagemagick.org/script/convert.php) utility to
 create the copies of the original images. Thus both Python and
 ImageMagick must be installed to run **pig.py**.
+
+## PIE (Pius' Image Editor)
 
 **pie.html**, on the other hand, is a browser-based tool, written in
 JavaScript (with CSS and HTML), originally intended only for rotating
@@ -58,6 +63,8 @@ will appear in a drop-down menu in the control panel. **cropList.py**
 can be used to generate **cropList.js** for all **.jpg** and **.png**
 files in the **originals** subdirectory.
 
+### Different modes for embedding images and applying filters
+
 Because some browsers behave differently depending on how an image is embedded
 in the web page and depending on how filters are applied to an image, **pie.html**
 allows different modes for embedding images and applying filters. Images can be
@@ -76,7 +83,7 @@ via that element's
 attribute, referencing a single SVG &lt;filter&gt; element which combines all of the
 user-specified filters.
 
-<table style="border: 1px solid black;">
+<table>
 <tr>
 <td>Mode</td>
 <td>Filters applied via CSS filter property</td>
