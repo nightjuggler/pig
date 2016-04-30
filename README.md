@@ -31,8 +31,10 @@ can be saved (if the original was not cross-origin).
 
 Each filter available in **pie.html** is implemented in two different ways:
 (1) with SVG and (2) with the Canvas API.
-Basic filters (e.g. ```contrast(200%)``` on all color channels) can also be CSS only.
-The SVG filters can be applied even to cross-origin images, animated GIFs
+In **HTML &lt;img&gt;** and **HTML &lt;video&gt;** modes (see more about modes below),
+basic filters (such as contrast or brightness applied to all color channels) are CSS-only
+instead of SVG.
+The SVG (and CSS-only) filters can be applied even to cross-origin images, animated GIFs
 (see [example](https://nightjuggler.com/pie/?f=contrast,rgb,200/polar/blur-x,gb,8,1/depolar&c=400x335+0+0&cors&i=https://media.giphy.com/media/F3Q638k5euONa/giphy.gif)),
 while playing video
 (see [example](https://nightjuggler.com/pie/?i=MountMuir.mp4&c=640x480+0+0&f=convolve,rgb,10);
@@ -55,3 +57,21 @@ can define a list of image (and/or video) files (and/or URLs) that
 will appear in a drop-down menu in the control panel. **cropList.py**
 can be used to generate **cropList.js** for all **.jpg** and **.png**
 files in the **originals** subdirectory.
+
+Because some browsers behave differently depending on how an image is embedded
+in the web page and depending on how filters are applied to an image, **pie.html**
+allows different modes for embedding images and applying filters. Images can be
+embedded using a stand-alone HTML &lt;img&gt; element, an SVG &lt;image&gt; element,
+or an HTML &lt;img&gt; element inside of an SVG &lt;foreignObject&gt; element.
+Video is embedded with an HTML &lt;video&gt; element either stand-alone or inside
+an SVG &lt;foreignObject&gt; element. If a stand-alone &lt;img&gt; or &lt;video&gt;
+element is used, filters are applied via the CSS
+[filter](https://developer.mozilla.org/en-US/docs/Web/CSS/filter)
+property, either as a sequence of CSS filter and url() functions (one function for
+each user-defined filter) or as a single url() function referencing a single SVG
+&lt;filter&gt; element which combines all of the user-defined filters.
+If an SVG &lt;image&gt; or &lt;foreignObject&gt; element is used, filters are applied
+via that element's
+[filter](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/filter)
+attribute, referencing a single SVG &lt;filter&gt; element which combines all of the
+user-defined filters.
