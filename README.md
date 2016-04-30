@@ -4,11 +4,11 @@ The first version of **pig** was written in May 2008, partly inspired by Max P's
 
 **pig** consists of two main components: **pig.py** and **pie.html**
 
-**pig.py** is a Python script that will create (1) resized (and cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs) according to **spec.py** and (2) HTML pages for a gallery / photo album containing those images.
+**pig.py** is a Python script that will (1) create resized (and cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs) according to **spec.py** and (2) create HTML pages for a gallery / photo album containing those images.
 
 **pig.py** uses [ImageMagick](https://www.imagemagick.org/)'s [convert](https://www.imagemagick.org/script/convert.php) utility to create the copies of the original images. Thus both Python and ImageMagick must be installed to run **pig.py**.
 
-**pie.html** is a browser-based tool, written in JavaScript (with CSS and HTML), originally intended only for rotating and precisely cropping images while maintaining their original aspect ratio in order to determine an image's crop geometry (which could then be copied and pasted into **spec.py** so that it will be passed to ImageMagick's convert utility by **pig.py**).
+**pie.html** is a browser-based tool, written in JavaScript (with CSS and HTML), originally intended only for rotating and precisely cropping images while maintaining their original aspect ratio in order to determine an image's crop geometry. The crop geometry can then be copied and pasted into the ```crop``` array in **spec.py** so that it will be passed to **convert** by **pig.py**.
 
 However, **pie.html** (see [https://nightjuggler.com/pie/](https://nightjuggler.com/pie/)) has now become more of a tool for experimenting with sequences of filters (such as contrast and brightness), applied to images or video. Each filter can be applied to all three color channels (red, green, and blue) or only selected ones, and a copy of the filtered image can also be saved (if the original was not cross-origin).
 
