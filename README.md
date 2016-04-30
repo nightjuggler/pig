@@ -1,19 +1,20 @@
 # PIG &amp; PIE
 
-The first version of **pig** was written in May 2008, partly inspired by Max P's **lightbox**.
-
-**pig** consists of two main components: **pig.py** and **pie.html**.
+This project consists of two main components that can be used
+independently of each other: **pig.py** (PIG) and **pie.html** (PIE).
+The first version of **pig.py** was written in May 2008, partly
+inspired by Max P's **lightbox**.
 
 ## PIG (Pius' Image Gallery)
 
 **pig.py** is a Python script that will (1) create resized (and
 cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs)
 according to **spec.py** and (2) create HTML pages for a gallery /
-photo album containing those images (**index_template.html** and
-**page_template.html** are used as templates for the HTML pages).
-**pig.py** uses [ImageMagick](https://www.imagemagick.org/)'s
-[convert](https://www.imagemagick.org/script/convert.php) utility to
-create the copies of the original images. Thus both Python and
+photo album containing those images. **index_template.html** and
+**page_template.html** are used as templates for the HTML pages.
+[ImageMagick](https://www.imagemagick.org/)'s
+[convert](https://www.imagemagick.org/script/convert.php) utility is
+used to create the copies of the original images. Thus both Python and
 ImageMagick must be installed to run **pig.py**.
 
 ## PIE (Pius' Image Editor)
