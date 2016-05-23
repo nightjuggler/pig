@@ -1285,7 +1285,7 @@ function imageLoaded(event)
 		var [w, h, x, y] = queryString.cropGeometry;
 		queryString.cropGeometry = null;
 
-		cropWidthField.value = w; changeCropWidth();
+		cropWidthField.value = w || maxWidth; changeCropWidth();
 		cropXField.value = x; changeCropX();
 		cropYField.value = y; changeCropY();
 		crop();
@@ -2057,8 +2057,11 @@ function getURL()
 	url += '?f=' + filterList.join('/');
 	if (imageFiles === undefined && imageNames !== undefined) {
 		if (cropped)
-			url += '&c=' + cropWidth + 'x' + cropHeight + '+'
-				+ cropXField.value + '+' + cropYField.value;
+			if (cropWidth === originalWidth && cropHeight === originalHeight)
+				url += '&c'
+			else
+				url += '&c=' + cropWidth + 'x' + cropHeight + '+'
+					+ cropXField.value + '+' + cropYField.value;
 		if (rotateAngle !== 0)
 			url += '&r=' + rotateAngle;
 		if (cropInverseAspectRatio)
@@ -2706,6 +2709,10 @@ function parseQueryString()
 		}
 		if (s === 'iar') {
 			queryString.inverseAspectRatio = true;
+			continue;
+		}
+		if (s === 'c') {
+			queryString.cropGeometry = [0, 0, 0, 0];
 			continue;
 		}
 		if (s === 'cors') {
