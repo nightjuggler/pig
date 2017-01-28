@@ -262,6 +262,8 @@ def exifReadIFD(b, i, ifdInfo):
 	return ifdData
 
 def exifRead(b):
+	global toInt2, toInt4
+
 	if b[0:2] == 'II':
 		toInt2 = leInt2
 		toInt4 = leInt4
