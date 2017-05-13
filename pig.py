@@ -37,6 +37,15 @@ def adjust_time(timestamp, dir_spec):
 	display_time = "%u-%u-%02u %u:%02u%s" % (month, day, year % 100, hour, minute, suffix)
 	return timestamp, display_time
 
+def get_greatest_common_divisor(a, b):
+	while b != 0:
+		a, b = b, a % b
+	return a
+
+def get_aspect_ratio(w, h):
+	gcd = get_greatest_common_divisor(w, h)
+	return (w/gcd, h/gcd)
+
 class ImageInfo(object):
 	NUMBER = 0
 	def __init__(self, name, dir_spec):
@@ -77,13 +86,20 @@ class ImageInfo(object):
 
 		width, height = original_image.size
 		if width < height:
+			aspect_ratio = get_aspect_ratio(height, width)
 			self.resize_width = dir_spec.height
 			self.resize_thumb_width = dir_spec.thumb_height
 			self.width, self.height = self.height, self.width
 			self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 		else:
+			aspect_ratio = get_aspect_ratio(width, height)
 			self.resize_width = dir_spec.width
 			self.resize_thumb_width = dir_spec.thumb_width
+
+		if aspect_ratio != dir_spec.aspect_ratio:
+			print 'Image aspect ratio ({}:{}) for "{}" not equal to spec aspect ratio ({}:{})'.format(
+				aspect_ratio[0], aspect_ratio[1], original_filename,
+				dir_spec.aspect_ratio[0], dir_spec.aspect_ratio[1])
 
 def print_image_pages(images):
 	page_template_file = open('page_template.html')
@@ -237,7 +253,7 @@ def convert(**convert_vars):
 	convert_vars['convert_path'] = convert_path
 	command = (
 		"%(convert_path)s %(in_path)s"
-		" %(pre_convert)s -resize %(width)u -strip -quality 85 %(extra_args)s %(post_convert)s"
+		" %(pre_convert)s -resize %(width)u -strip %(extra_args)s %(post_convert)s"
 		" %(out_path)s"
 	) % convert_vars
 
@@ -298,9 +314,17 @@ class DirSpec(object):
 		self.thumb_width = spec.thumb_width if thumb_width is None else thumb_width
 		self.thumb_height = spec.thumb_height if thumb_height is None else thumb_height
 
+		self.aspect_ratio = get_aspect_ratio(self.width, self.height)
+		thumb_aspect_ratio = get_aspect_ratio(self.thumb_width, self.thumb_height)
+
 		self.originals_dir = 'originals' + dir_suffix
 		self.images_dir = 'images' + dir_suffix
 		self.thumbs_dir = 'thumbs' + dir_suffix
+
+		if self.aspect_ratio != thumb_aspect_ratio:
+			print 'Spec aspect ratio ({}:{}) for "{}" not equal to thumb aspect ratio ({}:{})'.format(
+				self.aspect_ratio[0], self.aspect_ratio[1], self.originals_dir,
+				thumb_aspect_ratio[0], thumb_aspect_ratio[1])
 
 		if not os.path.exists(self.images_dir):
 			os.mkdir(self.images_dir)
