@@ -330,6 +330,8 @@ def jpegReadSegments(f):
 
 class Image(object):
 	def __init__(self, filename):
+		self.size = None
+		self.exifData = None
 		f = None
 		try:
 			f = open(filename, 'rb')
@@ -346,7 +348,6 @@ class Image(object):
 				width = beInt4(chunkData[:4])
 				height = beInt4(chunkData[4:8])
 				self.size = (width, height)
-				self.exifData = None
 #				pngReadChunks(b, f)
 		finally:
 			if f is not None:
