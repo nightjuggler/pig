@@ -2967,7 +2967,7 @@ function documentKeyDown(event)
 		if (document.getElementById('canvas').style.display !== 'block') {
 			var thePhoto = foreignObject ? svgImage.firstChild : photo;
 			if (thePhoto instanceof HTMLVideoElement)
-				(thePhoto.paused ? thePhoto.play : thePhoto.pause)();
+				thePhoto[thePhoto.paused ? 'play' : 'pause']();
 		}
 	} else
 		return true;
