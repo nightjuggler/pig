@@ -337,6 +337,13 @@ input[type="range"] {
 <script src="cropList.js"></script>
 <script src="filter.js"></script>
 <script>
+/* globals document, navigator, window */
+/* globals DOMException, Image, Option, URL */
+/* globals HTMLInputElement, HTMLOptionElement, HTMLSelectElement, HTMLVideoElement */
+/* globals svgNS, xlinkNS, singleFilter: true, prevFilterId: true, svgFilter, filterMarginX */
+/* globals Convolutions */
+"use strict";
+
 var originalWidth;
 var originalHeight;
 var aspectX;
@@ -674,7 +681,7 @@ function setDisplayArea()
 	if (divHeight > originalHeight)
 		divHeight = originalHeight;
 
-	if (divWidth / divHeight != originalWidth / originalHeight)
+	if (divWidth / divHeight !== originalWidth / originalHeight)
 	{
 		var m = Math.floor(divWidth / aspectX);
 		if (m === 0)
@@ -1516,6 +1523,7 @@ function overlayCanvas(event)
 	if (canvas === null)
 		return;
 
+	var photoDiv = document.getElementById("photoDiv");
 	canvas.style.left = photoDiv.offsetLeft + "px";
 	canvas.style.top = photoDiv.offsetTop + "px";
 	canvas.style.display = "block";
@@ -1887,7 +1895,7 @@ function simpleFilter(applyFilter)
 	return function(context, imageData, amount, channels) {
 		applyFilter(imageData.data, amount, channels);
 		return imageData;
-	}
+	};
 }
 var filterOptions = [
 new FilterOption('brightness', '%',   100, 0, 2000, simpleFilter(applyBrightnessFilter), false, createSVGBrightness),
@@ -2058,7 +2066,7 @@ function getURL()
 	if (imageFiles === undefined && imageNames !== undefined) {
 		if (cropped)
 			if (cropWidth === originalWidth && cropHeight === originalHeight)
-				url += '&c'
+				url += '&c';
 			else
 				url += '&c=' + cropWidth + 'x' + cropHeight + '+'
 					+ cropXField.value + '+' + cropYField.value;
@@ -2794,18 +2802,18 @@ function createFilterDiv()
 	for (var i = 0; i < filterOptions.length; ++i)
 		filterIndex[filterOptions[i].name] = i;
 
-	var option = filterOptions[filterIndex['threshold']];
+	var option = filterOptions[filterIndex.threshold];
 	option.noChangeValue = null;
 
-	option = filterOptions[filterIndex['polar']];
+	option = filterOptions[filterIndex.polar];
 	option.ui = polarUI;
 	option.noChangeValue = null;
 
-	option = filterOptions[filterIndex['depolar']];
+	option = filterOptions[filterIndex.depolar];
 	option.ui = polarUI;
 	option.noChangeValue = null;
 
-	option = filterOptions[filterIndex['convolve']];
+	option = filterOptions[filterIndex.convolve];
 	option.ui = convolveUI;
 
 	for (option of ['blur', 'blur-x', 'blur-y', 'd-blur-x', 'd-blur-y'])
@@ -2926,7 +2934,7 @@ function manageUserSpaceFilters()
 	}
 	if (updateFilters) {
 		applyFilters();
-		if (foreignObject) setTimeout(updateUserSpaceFilters, 500);
+		if (foreignObject) window.setTimeout(updateUserSpaceFilters, 500);
 	}
 }
 function documentKeyDown(event)
@@ -2959,7 +2967,7 @@ function documentKeyDown(event)
 		if (document.getElementById('canvas').style.display !== 'block') {
 			var thePhoto = foreignObject ? svgImage.firstChild : photo;
 			if (thePhoto instanceof HTMLVideoElement)
-				thePhoto.paused ? thePhoto.play() : thePhoto.pause();
+				(thePhoto.paused ? thePhoto.play : thePhoto.pause)();
 		}
 	} else
 		return true;

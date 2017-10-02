@@ -1,3 +1,8 @@
+/* globals console, document, SVGElement, Uint8ClampedArray */
+/* globals svgImage, svgMode, foreignObject */
+/* globals divHeight, divWidth, photoLeft, photoTop */
+"use strict";
+
 var svgNS = 'http://www.w3.org/2000/svg';
 var xlinkNS = 'http://www.w3.org/1999/xlink';
 var svgFilterId = 0;
@@ -1356,9 +1361,9 @@ function applyReversePolarTransform(context, imageData, value, channels, edgeMod
 }
 function applyFilterMatrix(d, channels, a0, a1, a2)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
@@ -1374,9 +1379,9 @@ function applyFilterMatrix(d, channels, a0, a1, a2)
 }
 function applyBrightnessFilter(d, amount, channels)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
@@ -1388,9 +1393,9 @@ function applyBrightnessFilter(d, amount, channels)
 }
 function applyContrastFilter(d, amount, channels)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	// V' = C * (V - 0.5) + 0.5
 	// where C = amount of contrast, V = current channel value, and V' = new channel value
@@ -1429,9 +1434,9 @@ function applyHueRotateFilter(d, amount, channels)
 }
 function applyInvertFilter(d, amount, channels)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var m = 1.0 - amount - amount;
 	var c = 255 * amount;
@@ -1464,9 +1469,9 @@ function applySepiaFilter(d, amount, channels)
 }
 function applyThreshold(d, amount, channels)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var dLen = d.length;
 	for (var i = 0; i < dLen; i += 4)
@@ -1478,9 +1483,9 @@ function applyThreshold(d, amount, channels)
 }
 function convolve3x3(context, inData, channels, kernel, abs)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var outData = context.createImageData(inData);
 	var s = inData.data;
@@ -1489,7 +1494,7 @@ function convolve3x3(context, inData, channels, kernel, abs)
 	var width = inData.width;
 	var height = inData.height;
 
-	sumOfWeights = 0;
+	var sumOfWeights = 0;
 	for (var weight of kernel)
 		sumOfWeights += weight;
 	if (sumOfWeights === 0)
@@ -1564,9 +1569,9 @@ function convolve3x3(context, inData, channels, kernel, abs)
 }
 function addImages(image1, image2, channels)
 {
-	var setR = ((channels & 1) === 1);
-	var setG = ((channels & 2) === 2);
-	var setB = ((channels & 4) === 4);
+	var setR = (channels & 1) === 1;
+	var setG = (channels & 2) === 2;
+	var setB = (channels & 4) === 4;
 
 	var d1 = image1.data;
 	var d2 = image2.data;
@@ -1625,11 +1630,11 @@ function createXYConvolutionFunctions(i)
 		var gX = convolve3x3(context, imageData, channels, cx.forCanvas, abs);
 		var gY = convolve3x3(context, imageData, channels, cy.forCanvas, abs);
 		return addImages(gX, gY, channels);
-	}
+	};
 	c.forSVG = function(channels, abs)
 	{
 		return addConvolutions(channels, cx.forSVG, cy.forSVG, abs);
-	}
+	};
 	c.allowAbs = cx.allowAbs && cy.allowAbs;
 }
 createXYConvolutionFunctions(1); // sobel x+y
