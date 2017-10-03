@@ -337,11 +337,12 @@ input[type="range"] {
 <script src="cropList.js"></script>
 <script src="filter.js"></script>
 <script>
+/* jshint -W014 */
 /* globals document, navigator, window */
 /* globals DOMException, Image, Option, URL */
 /* globals HTMLInputElement, HTMLOptionElement, HTMLSelectElement, HTMLVideoElement */
 /* globals svgNS, xlinkNS, singleFilter: true, prevFilterId: true, svgFilter, filterMarginX */
-/* globals Convolutions */
+/* globals Convolutions, updateUserSpaceFilters, resetUserSpaceFilters, removeSVGFilter */
 "use strict";
 
 var originalWidth;
@@ -406,6 +407,11 @@ var downloadURL = null;          // only used if downloadBlobURL is true
 var downloadQuality = 0.92;
 var downloadType = "image/jpeg";
 
+function toInt(s)
+{
+	var n = parseInt(s, 10);
+	return isNaN(n) || n.toString() !== s ? NaN : n;
+}
 function releaseElement()
 {
 	document.onmousemove = null;
@@ -1563,8 +1569,8 @@ var standardUI = {
 
 		if (info === undefined) return;
 
-		var value = parseInt(info.value, 10);
-		if (isNaN(value) || value != info.value || value === option.defaultValue
+		var value = toInt(info.value);
+		if (isNaN(value) || value === option.defaultValue
 			|| value < option.minValue
 			|| value > option.maxValue) return;
 
@@ -1632,8 +1638,8 @@ var blurUI = {
 
 		if (info === undefined) return;
 
-		var edgeMode = parseInt(info.extraValue, 10);
-		if (!isNaN(edgeMode) && edgeMode == info.extraValue && edgeMode > 0 && edgeMode <= 3) {
+		var edgeMode = toInt(info.extraValue);
+		if (!isNaN(edgeMode) && edgeMode > 0 && edgeMode <= 3) {
 			edgeSelect.selectedIndex = edgeMode;
 			filter.edgeMode = edgeSelect.options[edgeMode];
 		}
@@ -1719,13 +1725,13 @@ var polarUI = {
 		filter.edgeMode = 0;
 
 		if (info !== undefined) {
-			var value = parseInt(info.value, 10);
-			if (!isNaN(value) && value == info.value && value > 0 && value <= 3) {
+			var value = toInt(info.value);
+			if (!isNaN(value) && value > 0 && value <= 3) {
 				radiusSelect.selectedIndex = value;
 				filter.value = value;
 			}
-			var edgeMode = parseInt(info.extraValue, 10);
-			if (!isNaN(edgeMode) && edgeMode == info.extraValue && edgeMode > 0 && edgeMode <= 2) {
+			var edgeMode = toInt(info.extraValue);
+			if (!isNaN(edgeMode) && edgeMode > 0 && edgeMode <= 2) {
 				edgeSelect.selectedIndex = edgeMode;
 				filter.edgeMode = edgeMode;
 			}
@@ -1826,9 +1832,8 @@ var convolveUI = {
 
 		if (info === undefined) return;
 
-		var value = parseInt(info.value, 10);
-
-		if (isNaN(value) || value != info.value || value <= 0 || value > Convolutions.length) return;
+		var value = toInt(info.value);
+		if (isNaN(value) || value <= 0 || value > Convolutions.length) return;
 
 		opSelect.selectedIndex = value;
 		filter.value = value;
@@ -2437,11 +2442,11 @@ function changeFilterValue(filter, event)
 {
 	var inputElement = event.currentTarget;
 	var option = filter.option;
-	var value = parseInt(inputElement.value, 10);
+	var value = toInt(inputElement.value);
 
-	if (isNaN(value) || value != inputElement.value || value < option.minValue || value > option.maxValue) {
+	if (isNaN(value) || value < option.minValue || value > option.maxValue) {
 		inputElement.value = filter.value;
-	} else if (value != filter.value) {
+	} else if (value !== filter.value) {
 		filter.value = value;
 		if (inputElement === filter.sliderElement)
 			filter.inputElement.value = value;
@@ -2670,25 +2675,25 @@ function parseCropGeometry(v)
 
 	if ((i = v.indexOf('x')) < 0) return;
 	s = v.substr(0, i);
-	n = parseInt(s, 10);
-	if (isNaN(n) || n != s || n <= 0) return;
+	n = toInt(s);
+	if (isNaN(n) || n <= 0) return;
 	g.push(n);
 
 	if ((j = v.indexOf('+', ++i)) < 0) return;
 	s = v.substr(i, j-i);
-	n = parseInt(s, 10);
-	if (isNaN(n) || n != s || n <= 0) return;
+	n = toInt(s);
+	if (isNaN(n) || n <= 0) return;
 	g.push(n);
 
 	if ((i = v.indexOf('+', ++j)) < 0) return;
 	s = v.substr(j, i-j);
-	n = parseInt(s, 10);
-	if (isNaN(n) || n != s || n < 0) return;
+	n = toInt(s);
+	if (isNaN(n) || n < 0) return;
 	g.push(n);
 
 	s = v.substr(i+1);
-	n = parseInt(s, 10);
-	if (isNaN(n) || n != s || n < 0) return;
+	n = toInt(s);
+	if (isNaN(n) || n < 0) return;
 	g.push(n);
 
 	queryString.cropGeometry = g;
