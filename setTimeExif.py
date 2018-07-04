@@ -8,7 +8,11 @@ def formatTime(timestamp):
 	return "{}-{:02}-{:02} {:02}:{:02}:{:02}".format(*ymdhms)
 
 def setTimeExif(fileName, verbose=0):
-	image = Image(fileName)
+	try:
+		image = Image(fileName)
+	except Exception as e:
+		print fileName, e.__class__.__name__, str(e)
+		return False
 	exifTime = image.getTimeCreated()
 	if exifTime == 0:
 		if verbose > 1:
