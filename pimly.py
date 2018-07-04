@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #
 # pimly.py (Pius' Image Library)
 #
@@ -27,6 +28,9 @@ def sInt4(n):
 def escapeString(s):
 	return ''.join([c if 32 <= ord(c) <= 126 else '\\x{:02X}'.format(ord(c)) for c in s])
 
+def stringBytes(s):
+	return ' '.join([str(ord(c)) for c in s])
+
 # PNG Spec: https://www.w3.org/TR/PNG/
 
 def pngReadChunk(b, f):
@@ -54,7 +58,7 @@ def pngReadChunks(b, f):
 toInt2 = leInt2
 toInt4 = leInt4
 
-# Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-2012_E_C.pdf
+# Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-Translation-2016-E.pdf
 # DCF Spec: http://www.cipa.jp/std/documents/e/DC-009-2010_E.pdf
 # IFD = Image File Directory
 
@@ -70,9 +74,6 @@ class ExifTagData(object):
 		self.toStr = info.toStr
 		self.valueType = None
 		self.value = None
-
-escapeValue = lambda v: escapeString(v)
-escapeStrOrd = lambda v: escapeString(str(ord(v)))
 
 exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	270: ExifTagInfo('ImageDescription'),
@@ -92,10 +93,10 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		34850: ExifTagInfo('ExposureProgram'),
 		34855: ExifTagInfo('PhotographicSensitivity'),
 		34864: ExifTagInfo('SensitivityType'),
-		36864: ExifTagInfo('ExifVersion', toStr=escapeValue),
+		36864: ExifTagInfo('ExifVersion', toStr=escapeString),
 		36867: ExifTagInfo('DateTimeOriginal'),
 		36868: ExifTagInfo('DateTimeDigitized'),
-		37121: ExifTagInfo('ComponentsConfiguration', toStr=lambda v: ' '.join([str(ord(i)) for i in v])),
+		37121: ExifTagInfo('ComponentsConfiguration', toStr=stringBytes),
 		37122: ExifTagInfo('CompressedBitsPerPixel'),
 		37377: ExifTagInfo('ShutterSpeedValue'),
 		37378: ExifTagInfo('ApertureValue'),
@@ -106,12 +107,13 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		37384: ExifTagInfo('LightSource'),
 		37385: ExifTagInfo('Flash'),
 		37386: ExifTagInfo('FocalLength'),
+		37396: ExifTagInfo('SubjectArea'),
 		37500: ExifTagInfo('MakerNote'),
 		37510: ExifTagInfo('UserComment'),
 		37520: ExifTagInfo('SubSecTime'),
 		37521: ExifTagInfo('SubSecTimeOriginal'),
 		37522: ExifTagInfo('SubSecTimeDigitized'),
-		40960: ExifTagInfo('FlashpixVersion', toStr=escapeValue),
+		40960: ExifTagInfo('FlashpixVersion', toStr=escapeString),
 		40961: ExifTagInfo('ColorSpace'),
 		40962: ExifTagInfo('PixelXDimension'),
 		40963: ExifTagInfo('PixelYDimension'),
@@ -125,8 +127,8 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		41487: ExifTagInfo('FocalPlaneYResolution'),
 		41488: ExifTagInfo('FocalPlaneResolutionUnit'),
 		41495: ExifTagInfo('SensingMethod'),
-		41728: ExifTagInfo('FileSource', toStr=escapeStrOrd),
-		41729: ExifTagInfo('SceneType', toStr=escapeStrOrd),
+		41728: ExifTagInfo('FileSource', toStr=stringBytes),
+		41729: ExifTagInfo('SceneType', toStr=stringBytes),
 		41730: ExifTagInfo('CFAPattern'),
 		41985: ExifTagInfo('CustomRendered'),
 		41986: ExifTagInfo('ExposureMode'),
@@ -140,7 +142,11 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		41994: ExifTagInfo('Sharpness'),
 		41996: ExifTagInfo('SubjectDistanceRange'),
 		42032: ExifTagInfo('CameraOwnerName'),
+		42033: ExifTagInfo('BodySerialNumber'),
+		42034: ExifTagInfo('LensSpecification'),
+		42035: ExifTagInfo('LensMake'),
 		42036: ExifTagInfo('LensModel'),
+		42037: ExifTagInfo('LensSerialNumber'),
 	}),
 	34853: ExifTagInfo('GPS IFD', subIFD={
 		0: ExifTagInfo('GPSVersionID', toStr=lambda v: '.'.join([str(i) for i in v])),
@@ -148,6 +154,14 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		17: ExifTagInfo('GPSImgDirection'),
 	}),
 })
+
+def parseBPList(bplist):
+	return '{} ... [{}]'.format(bplist[:8], len(bplist))
+
+appleIFD = {
+	2: ExifTagInfo(2, toStr=parseBPList),
+	3: ExifTagInfo(3, toStr=parseBPList),
+}
 
 def exifPrintSorted(ifdData, level=0):
 	indent = '\t' * level
@@ -168,9 +182,24 @@ def exifPrintSorted(ifdData, level=0):
 		elif valueType == 2:
 			value = escapeString(value)
 		elif valueType == 7:
-			value = '...'
+
+			if name == 'MakerNote' and value.startswith('Apple iOS\x00'):
+				assert value[12:14] == 'MM'
+				assert (toInt2, toInt4) == (beInt2, beInt4)
+				assert toInt2(value[10:12]) == 1
+
+				print '{}MakerNote: Apple iOS'.format(indent)
+				appleData = exifReadIFD(value, 14, appleIFD)
+				exifPrintSorted(appleData, level + 1)
+				continue
+
+			if len(value) <= 10:
+				value = escapeString(value)
+			else:
+				value = '{} ... [{}]'.format(escapeString(value[:10]), len(value))
+
 		elif valueType == 5 or valueType == 10:
-			value = '{}/{}'.format(*value)
+			value = ' '.join(['{}/{}'.format(n, d) for n, d in value])
 
 		print '{}{}: {}'.format(indent, name, value)
 
@@ -178,7 +207,7 @@ def exifReadByte(b, i, count, offset):
 	if count == 1:
 		return ord(b[i])
 	if count <= 4:
-		return [ord(b[i + j]) for j in xrange(count)]
+		offset = i
 
 	return [ord(b[offset + j]) for j in xrange(count)]
 
@@ -205,7 +234,7 @@ def exifReadLong(b, i, count, offset):
 	return [toInt4(b[j:j+4]) for j in xrange(offset, offset + count*4, 4)]
 
 def exifReadRational(b, i, count, offset):
-	return [toInt4(b[offset:offset+4]), toInt4(b[offset+4:offset+8])]
+	return [(toInt4(b[j:j+4]), toInt4(b[j+4:j+8])) for j in xrange(offset, offset + count*8, 8)]
 
 def exifReadUndefined(b, i, count, offset):
 	if count <= 4:
@@ -220,7 +249,7 @@ def exifReadSignedLong(b, i, count, offset):
 	return [sInt4(toInt4(b[j:j+4])) for j in xrange(offset, offset + count*4, 4)]
 
 def exifReadSignedRational(b, i, count, offset):
-	return [sInt4(toInt4(b[offset:offset+4])), sInt4(toInt4(b[offset+4:offset+8]))]
+	return [(sInt4(toInt4(b[j:j+4])), sInt4(toInt4(b[j+4:j+8]))) for j in xrange(offset, offset + count*8, 8)]
 
 exifReadValue = {
 	1: exifReadByte,
@@ -248,7 +277,7 @@ def exifReadIFD(b, i, ifdInfo):
 		n -= 1
 		i += 12
 
-		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(str(tag)))
+		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(tag))
 		ifdData[tag] = tagData = ExifTagData(tagInfo)
 
 		if tagInfo.subIFD is None:
@@ -373,3 +402,22 @@ class Image(object):
 	def printExif(self):
 		if self.exifData is not None:
 			exifPrintSorted(self.exifData)
+
+def main():
+	import argparse
+	parser = argparse.ArgumentParser()
+	parser.add_argument('imagePath', nargs='+')
+	args = parser.parse_args()
+
+	for fileName in args.imagePath:
+		try:
+			image = Image(fileName)
+		except Exception as e:
+			print fileName, e.__class__.__name__, str(e)
+			return
+		print 'FileName:', fileName
+		print 'ByteOrder:', 'Big' if toInt4 is beInt4 else 'Little', 'Endian'
+		image.printExif()
+
+if __name__ == '__main__':
+	main()
