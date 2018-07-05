@@ -112,22 +112,35 @@ def exifReadSignedLong(b, offset, count):
 def exifReadSignedRational(b, offset, count):
 	return [(sInt4(E.int4(b, i)), sInt4(E.int4(b, i+4))) for i in xrange(offset, offset + count*8, 8)]
 
+def toStrInteger(value):
+	return ' '.join([str(v) for v in value])
+
+def toStrRational(value):
+	return ' '.join(['{}/{}'.format(n, d) for n, d in value])
+
+def toStrUndefined(value):
+	if len(value) <= 10:
+		return escapeString(value)
+
+	return '{} ... [{}]'.format(escapeString(value[:10]), len(value))
+
 class ExifType(object):
 	lookup = {}
 
-	def __init__(self, key, read, size):
+	def __init__(self, key, read, toStr, size):
 		self.read = read
 		self.size = size
+		self.toStr = toStr
 		self.lookup[key] = self
 
-ExifTypeByte           = ExifType( 1, exifReadByte,           1)
-ExifTypeAscii          = ExifType( 2, exifReadAscii,          1)
-ExifTypeShort          = ExifType( 3, exifReadShort,          2)
-ExifTypeLong           = ExifType( 4, exifReadLong,           4)
-ExifTypeRational       = ExifType( 5, exifReadRational,       2*ExifTypeLong.size)
-ExifTypeUndefined      = ExifType( 7, exifReadUndefined,      1)
-ExifTypeSignedLong     = ExifType( 9, exifReadSignedLong,     4)
-ExifTypeSignedRational = ExifType(10, exifReadSignedRational, 2*ExifTypeSignedLong.size)
+ExifTypeByte           = ExifType( 1, exifReadByte,           toStrInteger,   1)
+ExifTypeAscii          = ExifType( 2, exifReadAscii,          escapeString,   1)
+ExifTypeShort          = ExifType( 3, exifReadShort,          toStrInteger,   2)
+ExifTypeLong           = ExifType( 4, exifReadLong,           toStrInteger,   4)
+ExifTypeRational       = ExifType( 5, exifReadRational,       toStrRational,  2*ExifTypeLong.size)
+ExifTypeUndefined      = ExifType( 7, exifReadUndefined,      toStrUndefined, 1)
+ExifTypeSignedLong     = ExifType( 9, exifReadSignedLong,     toStrInteger,   4)
+ExifTypeSignedRational = ExifType(10, exifReadSignedRational, toStrRational,  2*ExifTypeSignedLong.size)
 
 class ExifTagInfo(object):
 	def __init__(self, name, subIFD=None, toStr=None):
@@ -141,6 +154,25 @@ class ExifTagData(object):
 		self.toStr = info.toStr
 		self.valueType = None
 		self.value = None
+
+def parseBPList(bplist):
+	return '{} ... [{}]'.format(bplist[:8], len(bplist))
+
+appleIFD = {
+	2: ExifTagInfo(2, toStr=parseBPList),
+	3: ExifTagInfo(3, toStr=parseBPList),
+}
+
+def toStrMakerNote(value):
+	if value.startswith('Apple iOS\x00'):
+		assert value[12:14] == 'MM'
+		assert E is BigEndian
+		assert E.int2(value, 10) == 1
+
+		print 'Apple iOS',
+		return exifReadIFD(value, 14, appleIFD)
+
+	return toStrUndefined(value)
 
 exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	270: ExifTagInfo('ImageDescription'),
@@ -175,7 +207,7 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		37385: ExifTagInfo('Flash'),
 		37386: ExifTagInfo('FocalLength'),
 		37396: ExifTagInfo('SubjectArea'),
-		37500: ExifTagInfo('MakerNote'),
+		37500: ExifTagInfo('MakerNote', toStr=toStrMakerNote),
 		37510: ExifTagInfo('UserComment'),
 		37520: ExifTagInfo('SubSecTime'),
 		37521: ExifTagInfo('SubSecTimeOriginal'),
@@ -222,55 +254,26 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	}),
 })
 
-def parseBPList(bplist):
-	return '{} ... [{}]'.format(bplist[:8], len(bplist))
-
-appleIFD = {
-	2: ExifTagInfo(2, toStr=parseBPList),
-	3: ExifTagInfo(3, toStr=parseBPList),
-}
-
 def exifPrintSorted(ifdData, level=0):
 	indent = '\t' * level
 
 	for tagData in sorted(ifdData.itervalues(), key=operator.attrgetter('name')):
 
-		name = tagData.name
 		value = tagData.value
 		valueType = tagData.valueType
 
-		if valueType is None:
-			print '{}{}:'.format(indent, name)
-			exifPrintSorted(value, level + 1)
-			continue
+		print '{}{}:'.format(indent, tagData.name),
 
 		if tagData.toStr is not None:
 			value = tagData.toStr(value)
-		elif valueType is ExifTypeAscii:
-			value = escapeString(value)
-		elif valueType is ExifTypeUndefined:
+		elif valueType is not None:
+			value = valueType.toStr(value)
 
-			if name == 'MakerNote' and value.startswith('Apple iOS\x00'):
-				assert value[12:14] == 'MM'
-				assert E is BigEndian
-				assert E.int2(value, 10) == 1
-
-				print '{}MakerNote: Apple iOS'.format(indent)
-				appleData = exifReadIFD(value, 14, appleIFD)
-				exifPrintSorted(appleData, level + 1)
-				continue
-
-			if len(value) <= 10:
-				value = escapeString(value)
-			else:
-				value = '{} ... [{}]'.format(escapeString(value[:10]), len(value))
-
-		elif valueType is ExifTypeRational or valueType is ExifTypeSignedRational:
-			value = ' '.join(['{}/{}'.format(n, d) for n, d in value])
+		if isinstance(value, dict):
+			print
+			exifPrintSorted(value, level + 1)
 		else:
-			value = ' '.join([str(v) for v in value])
-
-		print '{}{}: {}'.format(indent, name, value)
+			print value
 
 def exifReadIFD(b, i, ifdInfo):
 	ifdData = {}
