@@ -3,23 +3,42 @@
 # pimly.py (Pius' Image Library)
 #
 import operator
+import os
 import time
 
 __all__ = ('Image',)
 
-# Big Endian
+class BigEndian(object):
+	name = 'Big Endian'
+	@staticmethod
+	def int4(b, i=0):
+		return ord(b[i+3]) + (ord(b[i+2])<<8) + (ord(b[i+1])<<16) + (ord(b[i])<<24)
+	@staticmethod
+	def int2(b, i=0):
+		return ord(b[i+1]) + (ord(b[i])<<8)
+	@staticmethod
+	def str4(n):
+		return ''.join((chr((n>>24)&255), chr((n>>16)&255), chr((n>>8)&255), chr(n&255)))
+	@staticmethod
+	def str2(n):
+		return ''.join((chr((n>>8)&255), chr(n&255)))
 
-def beInt4(b):
-	return ord(b[3]) + (ord(b[2])<<8) + (ord(b[1])<<16) + (ord(b[0])<<24)
-def beInt2(b):
-	return ord(b[1]) + (ord(b[0])<<8)
+class LittleEndian(object):
+	name = 'Little Endian'
+	@staticmethod
+	def int4(b, i=0):
+		return ord(b[i]) + (ord(b[i+1])<<8) + (ord(b[i+2])<<16) + (ord(b[i+3])<<24)
+	@staticmethod
+	def int2(b, i=0):
+		return ord(b[i]) + (ord(b[i+1])<<8)
+	@staticmethod
+	def str4(n):
+		return ''.join((chr(n&255), chr((n>>8)&255), chr((n>>16)&255), chr((n>>24)&255)))
+	@staticmethod
+	def str2(n):
+		return ''.join((chr(n&255), chr((n>>8)&255)))
 
-# Little Endian
-
-def leInt4(b):
-	return ord(b[0]) + (ord(b[1])<<8) + (ord(b[2])<<16) + (ord(b[3])<<24)
-def leInt2(b):
-	return ord(b[0]) + (ord(b[1])<<8)
+E = LittleEndian
 
 # Convert 32-bit unsigned integer to 32-bit signed integer
 def sInt4(n):
@@ -36,7 +55,7 @@ def stringBytes(s):
 def pngReadChunk(b, f):
 	assert len(b) == 8
 
-	chunkLength = beInt4(b[:4])
+	chunkLength = BigEndian.int4(b)
 	chunkType = b[4:8]
 
 	# Read chunk data + CRC (4 bytes) + next chunk's length (4 bytes) and type (4 bytes)
@@ -55,12 +74,60 @@ def pngReadChunks(b, f):
 	assert chunkType == 'IEND'
 	assert chunkData == ''
 
-toInt2 = leInt2
-toInt4 = leInt4
+def pngReadHeader(image, b, f):
+	chunkType, chunkData, b = pngReadChunk(b, f)
+	assert chunkType == 'IHDR'
+	width = BigEndian.int4(chunkData)
+	height = BigEndian.int4(chunkData, 4)
+	image.size = (width, height)
+#	pngReadChunks(b, f)
 
 # Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-Translation-2016-E.pdf
 # DCF Spec: http://www.cipa.jp/std/documents/e/DC-009-2010_E.pdf
 # IFD = Image File Directory
+
+def exifReadByte(b, offset, count):
+	return [ord(b[i]) for i in xrange(offset, offset + count)]
+
+def exifReadAscii(b, offset, count):
+	value = b[offset : offset + count]
+	assert value[-1] == '\x00'
+	return value.rstrip('\x00\t\n\r ')
+
+def exifReadShort(b, offset, count):
+	return [E.int2(b, i) for i in xrange(offset, offset + count*2, 2)]
+
+def exifReadLong(b, offset, count):
+	return [E.int4(b, i) for i in xrange(offset, offset + count*4, 4)]
+
+def exifReadRational(b, offset, count):
+	return [(E.int4(b, i), E.int4(b, i+4)) for i in xrange(offset, offset + count*8, 8)]
+
+def exifReadUndefined(b, offset, count):
+	return b[offset : offset + count]
+
+def exifReadSignedLong(b, offset, count):
+	return [sInt4(E.int4(b, i)) for i in xrange(offset, offset + count*4, 4)]
+
+def exifReadSignedRational(b, offset, count):
+	return [(sInt4(E.int4(b, i)), sInt4(E.int4(b, i+4))) for i in xrange(offset, offset + count*8, 8)]
+
+class ExifType(object):
+	lookup = {}
+
+	def __init__(self, key, read, size):
+		self.read = read
+		self.size = size
+		self.lookup[key] = self
+
+ExifTypeByte           = ExifType( 1, exifReadByte,           1)
+ExifTypeAscii          = ExifType( 2, exifReadAscii,          1)
+ExifTypeShort          = ExifType( 3, exifReadShort,          2)
+ExifTypeLong           = ExifType( 4, exifReadLong,           4)
+ExifTypeRational       = ExifType( 5, exifReadRational,       2*ExifTypeLong.size)
+ExifTypeUndefined      = ExifType( 7, exifReadUndefined,      1)
+ExifTypeSignedLong     = ExifType( 9, exifReadSignedLong,     4)
+ExifTypeSignedRational = ExifType(10, exifReadSignedRational, 2*ExifTypeSignedLong.size)
 
 class ExifTagInfo(object):
 	def __init__(self, name, subIFD=None, toStr=None):
@@ -179,14 +246,14 @@ def exifPrintSorted(ifdData, level=0):
 
 		if tagData.toStr is not None:
 			value = tagData.toStr(value)
-		elif valueType == 2:
+		elif valueType is ExifTypeAscii:
 			value = escapeString(value)
-		elif valueType == 7:
+		elif valueType is ExifTypeUndefined:
 
 			if name == 'MakerNote' and value.startswith('Apple iOS\x00'):
 				assert value[12:14] == 'MM'
-				assert (toInt2, toInt4) == (beInt2, beInt4)
-				assert toInt2(value[10:12]) == 1
+				assert E is BigEndian
+				assert E.int2(value, 10) == 1
 
 				print '{}MakerNote: Apple iOS'.format(indent)
 				appleData = exifReadIFD(value, 14, appleIFD)
@@ -198,112 +265,57 @@ def exifPrintSorted(ifdData, level=0):
 			else:
 				value = '{} ... [{}]'.format(escapeString(value[:10]), len(value))
 
-		elif valueType == 5 or valueType == 10:
+		elif valueType is ExifTypeRational or valueType is ExifTypeSignedRational:
 			value = ' '.join(['{}/{}'.format(n, d) for n, d in value])
+		else:
+			value = ' '.join([str(v) for v in value])
 
 		print '{}{}: {}'.format(indent, name, value)
-
-def exifReadByte(b, i, count, offset):
-	if count == 1:
-		return ord(b[i])
-	if count <= 4:
-		offset = i
-
-	return [ord(b[offset + j]) for j in xrange(count)]
-
-def exifReadAscii(b, i, count, offset):
-	if count <= 4:
-		offset = i
-
-	value = b[offset : offset + count]
-	assert value[-1] == '\x00'
-	return value.rstrip('\x00\t\n\r ')
-
-def exifReadShort(b, i, count, offset):
-	if count == 1:
-		return toInt2(b[i:i+2])
-	if count == 2:
-		return [toInt2(b[i:i+2]), toInt2(b[i+2:i+4])]
-
-	return [toInt2(b[j:j+2]) for j in xrange(offset, offset + count*2, 2)]
-
-def exifReadLong(b, i, count, offset):
-	if count == 1:
-		return offset
-
-	return [toInt4(b[j:j+4]) for j in xrange(offset, offset + count*4, 4)]
-
-def exifReadRational(b, i, count, offset):
-	return [(toInt4(b[j:j+4]), toInt4(b[j+4:j+8])) for j in xrange(offset, offset + count*8, 8)]
-
-def exifReadUndefined(b, i, count, offset):
-	if count <= 4:
-		offset = i
-
-	return b[offset : offset + count]
-
-def exifReadSignedLong(b, i, count, offset):
-	if count == 1:
-		return sInt4(offset)
-
-	return [sInt4(toInt4(b[j:j+4])) for j in xrange(offset, offset + count*4, 4)]
-
-def exifReadSignedRational(b, i, count, offset):
-	return [(sInt4(toInt4(b[j:j+4])), sInt4(toInt4(b[j+4:j+8]))) for j in xrange(offset, offset + count*8, 8)]
-
-exifReadValue = {
-	1: exifReadByte,
-	2: exifReadAscii,
-	3: exifReadShort,
-	4: exifReadLong,
-	5: exifReadRational,
-	7: exifReadUndefined,
-	9: exifReadSignedLong,
-	10: exifReadSignedRational,
-}
 
 def exifReadIFD(b, i, ifdInfo):
 	ifdData = {}
 
-	n = toInt2(b[i:i+2]) # Number of fields
+	n = E.int2(b, i) # Number of fields
 	i += 2
 
 	while n > 0:
-		tag = toInt2(b[i:i+2])
-		valueType = toInt2(b[i+2:i+4])
-		count = toInt4(b[i+4:i+8])
-		offset = toInt4(b[i+8:i+12])
+		tag = E.int2(b, i)
+		valueType = E.int2(b, i+2)
+		count = E.int4(b, i+4)
 
 		n -= 1
-		i += 12
+		i += 8
 
 		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(tag))
 		ifdData[tag] = tagData = ExifTagData(tagInfo)
 
 		if tagInfo.subIFD is None:
-			tagData.valueType = valueType
-			tagData.value = exifReadValue[valueType](b, i - 4, count, offset)
+			tagData.valueType = typeInfo = ExifType.lookup[valueType]
+			tagData.offset = offset = E.int4(b, i) if typeInfo.size * count > 4 else i
+			tagData.value = typeInfo.read(b, offset, count)
+			tagData.count = count
 		else:
 			assert valueType == 4
 			assert count == 1
+			offset = E.int4(b, i)
 			tagData.value = exifReadIFD(b, offset, tagInfo.subIFD)
+
+		i += 4
 
 	return ifdData
 
 def exifRead(b):
-	global toInt2, toInt4
+	global E
 
 	if b[0:2] == 'II':
-		toInt2 = leInt2
-		toInt4 = leInt4
+		E = LittleEndian
 	else:
 		assert b[0:2] == 'MM'
-		toInt2 = beInt2
-		toInt4 = beInt4
+		E = BigEndian
 
-	assert toInt2(b[2:4]) == 42
+	assert E.int2(b, 2) == 42
 
-	ifd0_offset = toInt4(b[4:8])
+	ifd0_offset = E.int4(b, 4)
 
 	return exifReadIFD(b, ifd0_offset, exifIFD0.subIFD)
 
@@ -317,10 +329,8 @@ startOfFrameMarkers = (
 	0xCD, 0xCE, 0xCF,
 )
 
-def jpegReadSegments(f):
-	width = None
-	height = None
-	exifData = None
+def jpegReadSegments(image, f):
+	beInt2 = BigEndian.int2
 
 	f.seek(0) # Rewind to the beginning of the file
 
@@ -337,8 +347,9 @@ def jpegReadSegments(f):
 			continue
 		if marker in startOfFrameMarkers:
 			b = f.read(6)
-			width = beInt2(b[3:5])
-			height = beInt2(b[1:3])
+			width = beInt2(b, 3)
+			height = beInt2(b, 1)
+			image.size = (width, height)
 			break
 
 		segmentLength = beInt2(b) - 2
@@ -347,40 +358,31 @@ def jpegReadSegments(f):
 			b = f.read(6)
 			segmentLength -= 6
 			if b == 'Exif\x00\x00':
+				image.exifOffset = f.tell()
 				b = f.read(segmentLength)
-				exifData = exifRead(b)
+				image.exifData = exifRead(b)
 				b = f.read(2)
 				continue
 
 		f.seek(segmentLength, 1)
 		b = f.read(2)
 
-	return (width, height), exifData
-
 class Image(object):
 	def __init__(self, filename):
+		self.fileName = filename
 		self.size = None
 		self.exifData = None
-		f = None
-		try:
-			f = open(filename, 'rb')
+
+		with open(filename, 'rb') as f:
 			b = f.read(16)
 			if b[:4] == '\xFF\xD8\xFF\xE1' and b[6:11] == 'Exif\x00':
-				self.size, self.exifData = jpegReadSegments(f)
+				jpegReadSegments(self, f)
 
 			elif b[:4] == '\xFF\xD8\xFF\xE0' and b[6:11] == 'JFIF\x00':
-				self.size, self.exifData = jpegReadSegments(f)
+				jpegReadSegments(self, f)
 
 			elif b[:8] == '\x89PNG\r\n\x1A\n':
-				chunkType, chunkData, b = pngReadChunk(b[8:], f)
-				assert chunkType == 'IHDR'
-				width = beInt4(chunkData[:4])
-				height = beInt4(chunkData[4:8])
-				self.size = (width, height)
-#				pngReadChunks(b, f)
-		finally:
-			if f is not None:
-				f.close()
+				pngReadHeader(self, b[8:], f)
 
 	def getTimeCreated(self):
 		if self.exifData is None:
@@ -403,11 +405,70 @@ class Image(object):
 		if self.exifData is not None:
 			exifPrintSorted(self.exifData)
 
+def setOrientation(image, args):
+	if image.exifData is None:
+		print '{} doesn\'t have Exif metadata'.format(image.fileName)
+		return
+
+	tagData = image.exifData.get(274)
+	if tagData is None:
+		print '{} doesn\'t have an Orientation tag'.format(image.fileName)
+		return
+
+	assert tagData.valueType is ExifTypeShort
+	assert tagData.count == 1
+
+	newValue = args.orientation
+
+	if tagData.value[0] == newValue:
+		print '{} already has Orientation {}'.format(image.fileName, newValue)
+		return
+
+	if not image.fileName.endswith(('.JPG', '.jpg', '.JPEG', '.jpeg')):
+		print '{} must end with .JPG, .jpg, .JPEG, or .jpeg'.format(image.fileName)
+		return
+
+	fileName, suffix = image.fileName.rsplit('.', 1)
+	fileName = '.'.join((fileName, 'new', suffix))
+
+	if os.path.exists(fileName):
+		print '{} already exists (will not overwrite)'.format(fileName)
+		return
+
+	print 'Creating {} ...'.format(fileName),
+
+	with open(image.fileName, 'rb') as oldFile, open(fileName, 'wb') as newFile:
+
+		newFile.write(oldFile.read(image.exifOffset + tagData.offset))
+		oldFile.read(2)
+
+		b = E.str2(newValue)
+		while b != '':
+			newFile.write(b)
+			b = oldFile.read(1<<12)
+
+		fileInfo = os.fstat(oldFile.fileno())
+		os.fchmod(newFile.fileno(), fileInfo.st_mode)
+
+	os.utime(fileName, (fileInfo.st_atime, fileInfo.st_mtime))
+	print 'Done'
+
+def printExif(image, args):
+	print 'FileName:', image.fileName
+	print 'ByteOrder:', E.name
+	image.printExif()
+
 def main():
 	import argparse
 	parser = argparse.ArgumentParser()
+	parser.add_argument('-o', '--orientation', type=int, default=0, choices=range(1, 9))
 	parser.add_argument('imagePath', nargs='+')
 	args = parser.parse_args()
+
+	if args.orientation != 0:
+		action = setOrientation
+	else:
+		action = printExif
 
 	for fileName in args.imagePath:
 		try:
@@ -415,9 +476,7 @@ def main():
 		except Exception as e:
 			print fileName, e.__class__.__name__, str(e)
 			return
-		print 'FileName:', fileName
-		print 'ByteOrder:', 'Big' if toInt4 is beInt4 else 'Little', 'Endian'
-		image.printExif()
+		action(image, args)
 
 if __name__ == '__main__':
 	main()
