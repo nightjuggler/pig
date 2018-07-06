@@ -165,6 +165,9 @@ appleIFD = {
 }
 
 def toStrMakerNote(value):
+	if isinstance(value, list):
+		return toStrInteger(value)
+
 	if value.startswith('Apple iOS\x00'):
 		assert value[12:14] == 'MM'
 		assert E is BigEndian
@@ -202,15 +205,20 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	316: ExifTagInfo('HostComputer'),
 	531: ExifTagInfo('YCbCrPositioning'),
 
+	33432: ExifTagInfo('Copyright'),
 	34665: ExifTagInfo('Exif IFD', subIFD={
 		33434: ExifTagInfo('ExposureTime'),
 		33437: ExifTagInfo('FNumber'),
 		34850: ExifTagInfo('ExposureProgram'),
 		34855: ExifTagInfo('PhotographicSensitivity'),
 		34864: ExifTagInfo('SensitivityType'),
+		34866: ExifTagInfo('RecommendedExposureIndex'),
 		36864: ExifTagInfo('ExifVersion', toStr=escapeString),
 		36867: ExifTagInfo('DateTimeOriginal'),
 		36868: ExifTagInfo('DateTimeDigitized'),
+		36880: ExifTagInfo('OffsetTime'),
+		36881: ExifTagInfo('OffsetTimeOriginal'),
+		36882: ExifTagInfo('OffsetTimeDigitized'),
 		37121: ExifTagInfo('ComponentsConfiguration', toStr=stringBytes),
 		37122: ExifTagInfo('CompressedBitsPerPixel'),
 		37377: ExifTagInfo('ShutterSpeedValue'),
@@ -233,6 +241,7 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		40961: ExifTagInfo('ColorSpace'),
 		40962: ExifTagInfo('PixelXDimension'),
 		40963: ExifTagInfo('PixelYDimension'),
+		40964: ExifTagInfo('RelatedSoundFile'),
 		40965: ExifTagInfo('Interoperability IFD', subIFD={
 			1: ExifTagInfo('InteroperabilityIndex'),
 			2: ExifTagInfo('InteroperabilityVersion'),
@@ -242,6 +251,8 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		41486: ExifTagInfo('FocalPlaneXResolution'),
 		41487: ExifTagInfo('FocalPlaneYResolution'),
 		41488: ExifTagInfo('FocalPlaneResolutionUnit'),
+		41492: ExifTagInfo('SubjectLocation'),
+		41493: ExifTagInfo('ExposureIndex'),
 		41495: ExifTagInfo('SensingMethod'),
 		41728: ExifTagInfo('FileSource', toStr=stringBytes),
 		41729: ExifTagInfo('SceneType', toStr=stringBytes),
