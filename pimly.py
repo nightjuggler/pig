@@ -91,7 +91,8 @@ def exifReadByte(b, offset, count):
 
 def exifReadAscii(b, offset, count):
 	value = b[offset : offset + count]
-	assert value[-1] == '\x00'
+	if value[-1] != '\x00':
+		print 'ASCII value not terminated with NULL: {}'.format(escapeString(value))
 	return value.rstrip('\x00\t\n\r ')
 
 def exifReadShort(b, offset, count):
@@ -174,6 +175,19 @@ def toStrMakerNote(value):
 
 	return toStrUndefined(value)
 
+def toStrDegrees(value):
+	(n, d), = value
+	return '{}/{} ({:.2f} degrees)'.format(n, d, float(n)/d)
+
+def toStrDegMinSec(value):
+	(d1, d2), (m1, m2), (s1, s2) = value
+	degrees = float(d1)/d2 + float(m1)/m2/60 + float(s1)/s2/3600
+	return '{}/{} {}/{} {}/{} ({:.6f} degrees)'.format(d1, d2, m1, m2, s1, s2, degrees)
+
+def toStrAltitude(value):
+	(n, d), = value
+	return '{}/{} ({:.1f} meters)'.format(n, d, float(n)/d)
+
 exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	270: ExifTagInfo('ImageDescription'),
 	271: ExifTagInfo('Make'),
@@ -184,6 +198,8 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	296: ExifTagInfo('ResolutionUnit'),
 	305: ExifTagInfo('Software'),
 	306: ExifTagInfo('DateTime'),
+	315: ExifTagInfo('Artist'),
+	316: ExifTagInfo('HostComputer'),
 	531: ExifTagInfo('YCbCrPositioning'),
 
 	34665: ExifTagInfo('Exif IFD', subIFD={
@@ -202,6 +218,7 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		37379: ExifTagInfo('BrightnessValue'),
 		37380: ExifTagInfo('ExposureBiasValue'),
 		37381: ExifTagInfo('MaxApertureValue'),
+		37382: ExifTagInfo('SubjectDistance'),
 		37383: ExifTagInfo('MeteringMode'),
 		37384: ExifTagInfo('LightSource'),
 		37385: ExifTagInfo('Flash'),
@@ -249,9 +266,39 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	}),
 	34853: ExifTagInfo('GPS IFD', subIFD={
 		0: ExifTagInfo('GPSVersionID', toStr=lambda v: '.'.join([str(i) for i in v])),
+		1: ExifTagInfo('GPSLatitudeRef'),
+		2: ExifTagInfo('GPSLatitude', toStr=toStrDegMinSec),
+		3: ExifTagInfo('GPSLongitudeRef'),
+		4: ExifTagInfo('GPSLongitude', toStr=toStrDegMinSec),
+		5: ExifTagInfo('GPSAltitudeRef'),
+		6: ExifTagInfo('GPSAltitude', toStr=toStrAltitude),
+		7: ExifTagInfo('GPSTimeStamp'),
+		8: ExifTagInfo('GPSSatellites'),
+		9: ExifTagInfo('GPSStatus'),
+		10: ExifTagInfo('GPSMeasureMode'),
+		11: ExifTagInfo('GPSDOP'),
+		12: ExifTagInfo('GPSSpeedRef'),
+		13: ExifTagInfo('GPSSpeed'),
+		14: ExifTagInfo('GPSTrackRef'),
+		15: ExifTagInfo('GPSTrack'),
 		16: ExifTagInfo('GPSImgDirectionRef'),
-		17: ExifTagInfo('GPSImgDirection'),
+		17: ExifTagInfo('GPSImgDirection', toStr=toStrDegrees),
+		18: ExifTagInfo('GPSMapDatum'),
+		19: ExifTagInfo('GPSDestLatitudeRef'),
+		20: ExifTagInfo('GPSDestLatitude', toStr=toStrDegMinSec),
+		21: ExifTagInfo('GPSDestLongitudeRef'),
+		22: ExifTagInfo('GPSDestLongitude', toStr=toStrDegMinSec),
+		23: ExifTagInfo('GPSDestBearingRef'),
+		24: ExifTagInfo('GPSDestBearing', toStr=toStrDegrees),
+		25: ExifTagInfo('GPSDestDistanceRef'),
+		26: ExifTagInfo('GPSDestDistance'),
+		27: ExifTagInfo('GPSProcessingMethod'),
+		28: ExifTagInfo('GPSAreaInformation'),
+		29: ExifTagInfo('GPSDateStamp'),
+		30: ExifTagInfo('GPSDifferential'),
+		31: ExifTagInfo('GPSHPositioningError'),
 	}),
+	50341: ExifTagInfo('PrintImageMatching'),
 })
 
 def exifPrintSorted(ifdData, level=0):
@@ -284,9 +331,11 @@ def exifReadIFD(b, i, ifdInfo):
 	while n > 0:
 		tag = E.int2(b, i)
 		valueType = E.int2(b, i+2)
-		count = E.int4(b, i+4)
 
-		n -= 1
+		if tag == 0 and valueType == 0:
+			break
+
+		count = E.int4(b, i+4)
 		i += 8
 
 		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(tag))
@@ -304,6 +353,7 @@ def exifReadIFD(b, i, ifdInfo):
 			tagData.value = exifReadIFD(b, offset, tagInfo.subIFD)
 
 		i += 4
+		n -= 1
 
 	return ifdData
 
