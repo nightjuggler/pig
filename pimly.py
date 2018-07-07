@@ -2,8 +2,11 @@
 #
 # pimly.py (Pius' Image Library)
 #
+from __future__ import print_function
+
 import operator
 import os
+import sys
 import time
 
 __all__ = ('Image',)
@@ -92,7 +95,7 @@ def exifReadByte(b, offset, count):
 def exifReadAscii(b, offset, count):
 	value = b[offset : offset + count]
 	if value[-1] != '\x00':
-		print 'ASCII value not terminated with NULL: {}'.format(escapeString(value))
+		print('ASCII value not terminated with NULL:', escapeString(value), file=sys.stderr)
 	return value.rstrip('\x00\t\n\r ')
 
 def exifReadShort(b, offset, count):
@@ -173,7 +176,7 @@ def toStrMakerNote(value):
 		assert E is BigEndian
 		assert E.int2(value, 10) == 1
 
-		print 'Apple iOS',
+		print('Apple iOS', end='')
 		return exifReadIFD(value, 14, appleIFD)
 
 	return toStrUndefined(value)
@@ -312,26 +315,43 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	50341: ExifTagInfo('PrintImageMatching'),
 })
 
-def exifPrintSorted(ifdData, level=0):
-	indent = '\t' * level
+def exifPrintSorted(ifdData, level=0, oneLine=False):
+	if oneLine:
+		indent = ''
+		tagEnd = '='
+		valEnd = ','
+	else:
+		indent = '\t' * level
+		tagEnd = ': '
+		valEnd = '\n'
 
 	for tagData in sorted(ifdData.itervalues(), key=operator.attrgetter('name')):
 
 		value = tagData.value
 		valueType = tagData.valueType
 
-		print '{}{}:'.format(indent, tagData.name),
+		if valueType is None:
+			if not oneLine:
+				print(indent, tagData.name, sep='', end=':\n')
+
+			exifPrintSorted(value, level + 1, oneLine)
+			continue
+
+		print(indent, tagData.name, sep='', end=tagEnd)
 
 		if tagData.toStr is not None:
 			value = tagData.toStr(value)
-		elif valueType is not None:
+			if isinstance(value, dict):
+				print(end=valEnd)
+				exifPrintSorted(value, level + 1, oneLine)
+				continue
+		else:
 			value = valueType.toStr(value)
 
-		if isinstance(value, dict):
-			print
-			exifPrintSorted(value, level + 1)
-		else:
-			print value
+		print(value, end=valEnd)
+
+	if oneLine and level == 0:
+		print()
 
 def exifReadIFD(b, i, ifdInfo):
 	ifdData = {}
@@ -425,6 +445,7 @@ def jpegReadSegments(image, f):
 				image.exifOffset = f.tell()
 				b = f.read(segmentLength)
 				image.exifData = exifRead(b)
+				image.byteOrder = E
 				b = f.read(2)
 				continue
 
@@ -465,18 +486,25 @@ class Image(object):
 		except ValueError:
 			return 0
 
-	def printExif(self):
+	def printExif(self, oneLine=False):
 		if self.exifData is not None:
-			exifPrintSorted(self.exifData)
+			if oneLine:
+				print(self.fileName, end=',')
+				print('ByteOrder', self.byteOrder.name, sep='=', end=',')
+			else:
+				print('FileName', self.fileName, sep=': ')
+				print('ByteOrder', self.byteOrder.name, sep=': ')
+
+			exifPrintSorted(self.exifData, oneLine=oneLine)
 
 def setOrientation(image, args):
 	if image.exifData is None:
-		print '{} doesn\'t have Exif metadata'.format(image.fileName)
+		print(image.fileName, 'doesn\'t have Exif metadata')
 		return
 
 	tagData = image.exifData.get(274)
 	if tagData is None:
-		print '{} doesn\'t have an Orientation tag'.format(image.fileName)
+		print(image.fileName, 'doesn\'t have an Orientation tag')
 		return
 
 	assert tagData.valueType is ExifTypeShort
@@ -485,21 +513,21 @@ def setOrientation(image, args):
 	newValue = args.orientation
 
 	if tagData.value[0] == newValue:
-		print '{} already has Orientation {}'.format(image.fileName, newValue)
+		print(image.fileName, 'already has Orientation', newValue)
 		return
 
 	if not image.fileName.endswith(('.JPG', '.jpg', '.JPEG', '.jpeg')):
-		print '{} must end with .JPG, .jpg, .JPEG, or .jpeg'.format(image.fileName)
+		print(image.fileName, 'must end with .JPG, .jpg, .JPEG, or .jpeg')
 		return
 
 	fileName, suffix = image.fileName.rsplit('.', 1)
 	fileName = '.'.join((fileName, 'new', suffix))
 
 	if os.path.exists(fileName):
-		print '{} already exists (will not overwrite)'.format(fileName)
+		print(fileName, 'already exists (will not overwrite)')
 		return
 
-	print 'Creating {} ...'.format(fileName),
+	print('Creating', fileName, '...', end=' ')
 
 	with open(image.fileName, 'rb') as oldFile, open(fileName, 'wb') as newFile:
 
@@ -515,17 +543,16 @@ def setOrientation(image, args):
 		os.fchmod(newFile.fileno(), fileInfo.st_mode)
 
 	os.utime(fileName, (fileInfo.st_atime, fileInfo.st_mtime))
-	print 'Done'
+	print('Done')
 
 def printExif(image, args):
-	print 'FileName:', image.fileName
-	print 'ByteOrder:', E.name
-	image.printExif()
+	image.printExif(oneLine=args.one_line)
 
 def main():
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-o', '--orientation', type=int, default=0, choices=range(1, 9))
+	parser.add_argument('-l', '--one-line', action='store_true')
 	parser.add_argument('imagePath', nargs='+')
 	args = parser.parse_args()
 
@@ -538,7 +565,7 @@ def main():
 		try:
 			image = Image(fileName)
 		except Exception as e:
-			print fileName, e.__class__.__name__, str(e)
+			print(fileName, e.__class__.__name__, str(e))
 			return
 		action(image, args)
 
