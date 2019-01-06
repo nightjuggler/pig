@@ -138,6 +138,12 @@ def print_image_pages(images):
 		else:
 			caption = '<p class="caption">%s</p>\n' % caption
 
+		width, height = Image(os.path.join(image.spec.images_dir, image.name)).size
+		if (width, height) != (image.width, image.height):
+			print 'Changing image size for {} from {}x{} to {}x{}'.format(image.name,
+				image.width, image.height, width, height)
+			image.width, image.height = width, height
+
 		template_vars = {
 			'title': spec.title,
 			'date': spec.date,
@@ -224,6 +230,13 @@ def print_thumb_pages(images):
 	for image in images:
 		if col == 0:
 			table_data.append('<tr>')
+
+		width, height = Image(os.path.join(image.spec.thumbs_dir, image.name)).size
+		if (width, height) != (image.thumb_width, image.thumb_height):
+			print 'Changing thumb size for {} from {}x{} to {}x{}'.format(image.name,
+				image.thumb_width, image.thumb_height, width, height)
+			image.thumb_width, image.thumb_height = width, height
+
 		td_vars = {
 			'dir': image.spec.thumbs_dir,
 			'name': image.name,
