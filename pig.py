@@ -7,7 +7,6 @@ import time
 from pimly import Image
 import spec
 
-convert_path = '/usr/local/bin/convert'
 page_path_format = 'page%03u.html'
 
 time_adjust_cutoff = getattr(spec, 'time_adjust_cutoff', None)
@@ -88,13 +87,11 @@ class ImageInfo(object):
 		if width < height:
 			aspect_ratio = get_aspect_ratio(height, width)
 			self.resize_width = dir_spec.height
-			self.resize_thumb_width = dir_spec.thumb_height
 			self.width, self.height = self.height, self.width
 			self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 		else:
 			aspect_ratio = get_aspect_ratio(width, height)
 			self.resize_width = dir_spec.width
-			self.resize_thumb_width = dir_spec.thumb_width
 
 		if aspect_ratio != dir_spec.aspect_ratio:
 			print 'Image aspect ratio ({}:{}) for "{}" not equal to spec aspect ratio ({}:{})'.format(
@@ -262,13 +259,10 @@ def print_thumb_pages(images):
 			table_data.append('</tr>')
 		print_index_page(index_template, table_data, page_number + 1)
 
-def convert(**convert_vars):
-	convert_vars['convert_path'] = convert_path
-	command = (
-		"%(convert_path)s %(in_path)s"
-		" %(pre_convert)s -resize %(width)u -strip %(extra_args)s %(post_convert)s"
-		" %(out_path)s"
-	) % convert_vars
+def convert(in_path, out_path, conversions):
+	command = ['/usr/local/bin/magick', in_path, out_path]
+	command[2:2] = conversions
+	command = ' '.join(command)
 
 	print command
 	os.system(command)
@@ -279,31 +273,31 @@ def convert_all(images, options):
 		image_path = os.path.join(image.spec.images_dir, image.name)
 		thumb_path = os.path.join(image.spec.thumbs_dir, image.name)
 
-		extra_args = []
+		pre_convert = image.spec.pre_convert.get(image.name)
+		post_convert = image.spec.post_convert.get(image.name)
 
-		if image.name in image.spec.normalize or options.normalize_all:
-			extra_args.append('-normalize')
+		conversions = ['-strip']
+		if pre_convert:
+			conversions.append(pre_convert)
+		conversions.append('-resize')
+		conversions.append(str(image.resize_width))
 
 		if image.name in image.spec.rotate_right:
-			extra_args.append('-rotate 90')
+			conversions.append('-rotate 90')
 		elif image.name in image.spec.rotate_left:
-			extra_args.append('-rotate -90')
+			conversions.append('-rotate -90')
 		elif image.name in image.spec.rotate_180:
-			extra_args.append('-rotate 180')
+			conversions.append('-rotate 180')
 
-		extra_args = ' '.join(extra_args)
-
-		pre_convert = image.spec.pre_convert.get(image.name, '')
-		post_convert = image.spec.post_convert.get(image.name, '')
+		if image.name in image.spec.normalize or options.normalize_all:
+			conversions.append('-normalize')
+		if post_convert:
+			conversions.append(post_convert)
 
 		if options.convert_images and not os.path.exists(image_path):
-			convert(in_path=original_path, out_path=image_path,
-				width=image.resize_width, extra_args=extra_args,
-				pre_convert=pre_convert, post_convert=post_convert)
+			convert(original_path, image_path, conversions)
 		if options.convert_thumbs and not os.path.exists(thumb_path):
-			convert(in_path=original_path, out_path=thumb_path,
-				width=image.resize_thumb_width, extra_args=extra_args,
-				pre_convert=pre_convert, post_convert=post_convert)
+			convert(image_path, thumb_path, ['-resize', str(image.thumb_width)])
 
 class DirSpec(object):
 	def __init__(self, dir_suffix='', time_adjust=0,
@@ -316,9 +310,9 @@ class DirSpec(object):
 		self.rotate_right = set(rotate_right)
 		self.rotate_180 = set(rotate_180)
 		self.normalize = set(normalize)
-		self.pre_convert = ({} if pre_convert is None else pre_convert)
-		self.post_convert = ({} if post_convert is None else post_convert)
-		self.captions = ({} if captions is None else captions)
+		self.pre_convert = {} if pre_convert is None else pre_convert
+		self.post_convert = {} if post_convert is None else post_convert
+		self.captions = {} if captions is None else captions
 		self.skip = frozenset(skip)
 		self.best = frozenset(best)
 
@@ -349,6 +343,8 @@ class DirSpec(object):
 			self.crop_spec = DirSpec(
 				dir_suffix = dir_suffix + '_cropped',
 				time_adjust = time_adjust,
+				pre_convert = pre_convert,
+				post_convert = post_convert,
 				captions = captions,
 				width = width,
 				height = height,
@@ -383,11 +379,7 @@ class DirSpec(object):
 			if not os.path.exists(crop_path):
 				original_path = os.path.join(self.originals_dir, image_name)
 
-				command = "%s %s -crop %s %s" % (
-					convert_path, original_path, crop_geometry, crop_path)
-
-				print command
-				os.system(command)
+				convert(original_path, crop_path, ['-crop', crop_geometry])
 
 				original_stat = os.stat(original_path)
 				os.utime(crop_path, (original_stat.st_atime, original_stat.st_mtime))
