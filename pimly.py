@@ -353,6 +353,11 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 	if oneLine and level == 0:
 		print()
 
+badExifOffset = {
+	('2010:07:24 14:25:32', 194): 12, # IMG_0317.JPG
+	('2010:07:24 14:25:56', 194): 12, # IMG_0318.JPG
+}
+
 def exifReadIFD(b, i, ifdInfo):
 	ifdData = {}
 
@@ -362,8 +367,10 @@ def exifReadIFD(b, i, ifdInfo):
 	while n > 0:
 		tag = E.int2(b, i)
 		valueType = E.int2(b, i+2)
+		typeInfo = ExifType.lookup.get(valueType)
 
-		if tag == 0 and valueType == 0:
+		if typeInfo is None:
+			print('Unrecognized type', valueType, 'at offset', i+2, file=sys.stderr)
 			break
 
 		count = E.int4(b, i+4)
@@ -373,7 +380,7 @@ def exifReadIFD(b, i, ifdInfo):
 		ifdData[tag] = tagData = ExifTagData(tagInfo)
 
 		if tagInfo.subIFD is None:
-			tagData.valueType = typeInfo = ExifType.lookup[valueType]
+			tagData.valueType = typeInfo
 			tagData.offset = offset = E.int4(b, i) if typeInfo.size * count > 4 else i
 			tagData.value = typeInfo.read(b, offset, count)
 			tagData.count = count
@@ -381,6 +388,12 @@ def exifReadIFD(b, i, ifdInfo):
 			assert valueType == 4
 			assert count == 1
 			offset = E.int4(b, i)
+
+			if tag == 34665:
+				dateTime = ifdData.get(306)
+				if dateTime is not None:
+					offset += badExifOffset.get((dateTime.value, offset), 0)
+
 			tagData.value = exifReadIFD(b, offset, tagInfo.subIFD)
 
 		i += 4
@@ -564,8 +577,8 @@ def main():
 	for fileName in args.imagePath:
 		try:
 			image = Image(fileName)
-		except Exception as e:
-			print(fileName, e.__class__.__name__, str(e))
+		except IOError as e:
+			print(e, file=sys.stderr)
 			return
 		action(image, args)
 
