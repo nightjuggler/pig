@@ -9,6 +9,13 @@ import spec as global_spec
 
 page_path_format = 'page%03u.html'
 
+def format_ar(kind, aspect_ratio):
+	return '{} aspect ratio ({}:{})'.format(kind, *aspect_ratio)
+
+def check_ar(name, kind1, ar1, kind2, ar2):
+	if ar1 != ar2:
+		print format_ar(kind1, ar1), 'for "{}" not equal to'.format(name), format_ar(kind2, ar2)
+
 def adjust_time(timestamp, spec):
 	if timestamp > spec.time_adjust_cutoff:
 		timestamp += spec.time_adjust
@@ -40,17 +47,17 @@ def get_dimensions(spec_height, ar_width, ar_height):
 	return int(float(spec_height) * ar_width / ar_height + 0.5), spec_height
 
 class ImageInfo(object):
-	def __init__(self, name, spec, dir):
+	def __init__(self, name, spec, dir_spec):
 		self.name = name
 		self.spec = spec
-		self.dir = dir
+		self.dir = dir_spec
 
-		original_filename = os.path.join(dir.originals, name)
+		original_filename = os.path.join(dir_spec.originals, name)
 		stat_object = os.stat(original_filename)
 		original_image = Image(original_filename)
 
-		original_info = ['%ux%u' % original_image.size]
-		original_info.append('%.1fMB' % (float(stat_object.st_size) / 1024 / 1024))
+		original_info = ['{}x{}'.format(*original_image.size),
+			'{:.1f}MB'.format(stat_object.st_size / 1024.0 / 1024)]
 
 		timestamp = original_image.getTimeCreated()
 		if timestamp == 0:
@@ -64,20 +71,17 @@ class ImageInfo(object):
 
 		width, height = original_image.size
 		if width < height:
-			w, h = get_aspect_ratio(height, width)
-			self.height, self.width = get_dimensions(spec.height, w, h)
-			self.thumb_height, self.thumb_width = get_dimensions(spec.thumb_height, w, h)
+			aspect_ratio = get_aspect_ratio(height, width)
+			self.height, self.width = get_dimensions(spec.height, *aspect_ratio)
+			self.thumb_height, self.thumb_width = get_dimensions(spec.thumb_height, *aspect_ratio)
 		else:
-			w, h = get_aspect_ratio(width, height)
-			self.width, self.height = get_dimensions(spec.height, w, h)
-			self.thumb_width, self.thumb_height = get_dimensions(spec.thumb_height, w, h)
+			aspect_ratio = get_aspect_ratio(width, height)
+			self.width, self.height = get_dimensions(spec.height, *aspect_ratio)
+			self.thumb_width, self.thumb_height = get_dimensions(spec.thumb_height, *aspect_ratio)
 
 		self.resize_width = self.width
 
-		sw, sh = spec.aspect_ratio
-		if (w, h) != (sw, sh):
-			print 'Image aspect ratio ({}:{}) for "{}" not equal to spec aspect ratio ({}:{})'.format(
-				w, h, original_filename, sw, sh)
+		check_ar(original_filename, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
 
 	def rotate90(self):
 		self.width, self.height = self.height, self.width
@@ -311,23 +315,20 @@ class SharedSpec(object):
 
 def get_images(d):
 	dir_suffix = d.get('dir_suffix', '')
-	dir = DirSpec(dir_suffix)
+	dir_spec = DirSpec(dir_suffix)
+	originals = dir_spec.originals
 	spec = SharedSpec(d)
 
 	spec.aspect_ratio = get_aspect_ratio(spec.width, spec.height)
 	thumb_aspect_ratio = get_aspect_ratio(spec.thumb_width, spec.thumb_height)
-
-	if spec.aspect_ratio != thumb_aspect_ratio:
-		print 'Spec aspect ratio ({}:{}) for "{}" not equal to thumb aspect ratio ({}:{})'.format(
-			spec.aspect_ratio[0], spec.aspect_ratio[1], dir.originals,
-			thumb_aspect_ratio[0], thumb_aspect_ratio[1])
+	check_ar(originals, 'Spec', spec.aspect_ratio, 'thumb', thumb_aspect_ratio)
 
 	time_adjust_cutoff = d.get('time_adjust_cutoff', 0)
 	if time_adjust_cutoff != 0:
 		try:
 			time_adjust_cutoff = time.mktime(time.strptime(time_adjust_cutoff, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:
-			print 'Cannot parse time_adjust_cutoff for "{}"'.format(dir.originals)
+			print 'Cannot parse time_adjust_cutoff for "{}"'.format(originals)
 			time_adjust_cutoff = 0
 	spec.time_adjust_cutoff = time_adjust_cutoff
 
@@ -339,7 +340,7 @@ def get_images(d):
 				for name in d.get(attr, ())}
 
 	skip = frozenset(d.get('skip', ()))
-	images = [ImageInfo(name, spec, dir) for name in os.listdir(dir.originals)
+	images = [ImageInfo(name, spec, dir_spec) for name in os.listdir(originals)
 		if name not in skip and name[-4:] in ('.JPG', '.jpg', '.PNG', '.png')]
 
 	for image in images:
@@ -363,7 +364,7 @@ def get_images(d):
 			crop_path = os.path.join(crop_dir.originals, crop_image_name)
 
 			if not os.path.exists(crop_path):
-				original_path = os.path.join(dir.originals, image_name)
+				original_path = os.path.join(originals, image_name)
 
 				convert(original_path, crop_path, ['-crop', crop_geometry])
 
