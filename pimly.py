@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import operator
 import os
+import re
 import sys
 import time
 
@@ -61,6 +62,9 @@ def pngReadChunk(b, f):
 	chunkLength = BigEndian.int4(b)
 	chunkType = b[4:8]
 
+	if chunkType == 'IDAT':
+		return 'IEND', '', ''
+
 	# Read chunk data + CRC (4 bytes) + next chunk's length (4 bytes) and type (4 bytes)
 	b = f.read(chunkLength + 12)
 
@@ -70,9 +74,13 @@ def pngReadChunk(b, f):
 
 	return chunkType, chunkData, b
 
-def pngReadChunks(b, f):
+def pngReadChunks(image, b, f):
 	while b != '':
 		chunkType, chunkData, b = pngReadChunk(b, f)
+
+		if chunkType == 'iTXt':
+			if chunkData[:22] == 'XML:com.adobe.xmp\x00\x00\x00\x00\x00':
+				image.xmpData = chunkData[22:]
 
 	assert chunkType == 'IEND'
 	assert chunkData == ''
@@ -83,7 +91,7 @@ def pngReadHeader(image, b, f):
 	width = BigEndian.int4(chunkData)
 	height = BigEndian.int4(chunkData, 4)
 	image.size = (width, height)
-#	pngReadChunks(b, f)
+	pngReadChunks(image, b, f)
 
 # Exif Spec: http://www.cipa.jp/std/documents/e/DC-008-Translation-2016-E.pdf
 # DCF Spec: http://www.cipa.jp/std/documents/e/DC-009-2010_E.pdf
@@ -466,10 +474,15 @@ def jpegReadSegments(image, f):
 		b = f.read(2)
 
 class Image(object):
+	xmpEndOfLine = re.compile(' *\\n *')
+	xmpDateCreated = re.compile('<{0}>({1}-{2}-{2}T{2}:{2}:{2})</{0}>'.format(
+		'photoshop:DateCreated', '\\d{4}', '\\d{2}'))
+
 	def __init__(self, filename):
 		self.fileName = filename
 		self.size = None
 		self.exifData = None
+		self.xmpData = None
 
 		with open(filename, 'rb') as f:
 			b = f.read(16)
@@ -483,6 +496,15 @@ class Image(object):
 				pngReadHeader(self, b[8:], f)
 
 	def getTimeCreated(self):
+		if self.xmpData is not None:
+			m = self.xmpDateCreated.search(self.xmpData)
+			if m is None:
+				return 0
+			try:
+				return time.mktime(time.strptime(m.group(1), '%Y-%m-%dT%H:%M:%S'))
+			except ValueError:
+				return 0
+
 		if self.exifData is None:
 			return 0
 
@@ -509,6 +531,15 @@ class Image(object):
 				print('ByteOrder', self.byteOrder.name, sep=': ')
 
 			exifPrintSorted(self.exifData, oneLine=oneLine)
+
+	def printXMP(self, oneLine=False):
+		if self.xmpData is not None:
+			if oneLine:
+				print(self.fileName, end=',')
+				print(self.xmpEndOfLine.sub(' ', self.xmpData))
+			else:
+				print('FileName', self.fileName, sep=': ')
+				print(self.xmpData)
 
 def setOrientation(image, args):
 	if image.exifData is None:
@@ -559,7 +590,10 @@ def setOrientation(image, args):
 	print('Done')
 
 def printExif(image, args):
-	image.printExif(oneLine=args.one_line)
+	if image.xmpData:
+		image.printXMP(oneLine=args.one_line)
+	else:
+		image.printExif(oneLine=args.one_line)
 
 def main():
 	import argparse
