@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!python3
 import os
 import os.path
 import sys
@@ -17,13 +17,13 @@ def main():
 		names.append((oldname, tmpname, newname))
 
 	for oldname, tmpname, newname in names:
-		print 'Renaming', oldname, 'to', tmpname
+		print('Renaming', oldname, 'to', tmpname)
 		os.rename(oldname, tmpname)
 
 	for oldname, tmpname, newname in names:
 		if os.path.exists(newname):
 			sys.exit('"{}" already exists!'.format(newname))
-		print 'Renaming', tmpname, 'to', newname
+		print('Renaming', tmpname, 'to', newname)
 		os.rename(tmpname, newname)
 
 if __name__ == '__main__':

@@ -1,9 +1,7 @@
-#!/usr/bin/python
+#!python3
 #
 # pimly.py (Pius' Image Library)
 #
-from __future__ import print_function
-
 import operator
 import os
 import re
@@ -98,7 +96,7 @@ def pngReadHeader(image, b, f):
 # IFD = Image File Directory
 
 def exifReadByte(b, offset, count):
-	return [ord(b[i]) for i in xrange(offset, offset + count)]
+	return [ord(b[i]) for i in range(offset, offset + count)]
 
 def exifReadAscii(b, offset, count):
 	value = b[offset : offset + count]
@@ -107,22 +105,22 @@ def exifReadAscii(b, offset, count):
 	return value.rstrip('\x00\t\n\r ')
 
 def exifReadShort(b, offset, count):
-	return [E.int2(b, i) for i in xrange(offset, offset + count*2, 2)]
+	return [E.int2(b, i) for i in range(offset, offset + count*2, 2)]
 
 def exifReadLong(b, offset, count):
-	return [E.int4(b, i) for i in xrange(offset, offset + count*4, 4)]
+	return [E.int4(b, i) for i in range(offset, offset + count*4, 4)]
 
 def exifReadRational(b, offset, count):
-	return [(E.int4(b, i), E.int4(b, i+4)) for i in xrange(offset, offset + count*8, 8)]
+	return [(E.int4(b, i), E.int4(b, i+4)) for i in range(offset, offset + count*8, 8)]
 
 def exifReadUndefined(b, offset, count):
 	return b[offset : offset + count]
 
 def exifReadSignedLong(b, offset, count):
-	return [sInt4(E.int4(b, i)) for i in xrange(offset, offset + count*4, 4)]
+	return [sInt4(E.int4(b, i)) for i in range(offset, offset + count*4, 4)]
 
 def exifReadSignedRational(b, offset, count):
-	return [(sInt4(E.int4(b, i)), sInt4(E.int4(b, i+4))) for i in xrange(offset, offset + count*8, 8)]
+	return [(sInt4(E.int4(b, i)), sInt4(E.int4(b, i+4))) for i in range(offset, offset + count*8, 8)]
 
 def toStrInteger(value):
 	return ' '.join([str(v) for v in value])
@@ -598,7 +596,7 @@ def printExif(image, args):
 def main():
 	import argparse
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-o', '--orientation', type=int, default=0, choices=range(1, 9))
+	parser.add_argument('-o', '--orientation', type=int, default=0, choices=(1,2,3,4,5,6,7,8))
 	parser.add_argument('-l', '--one-line', action='store_true')
 	parser.add_argument('imagePath', nargs='+')
 	args = parser.parse_args()
