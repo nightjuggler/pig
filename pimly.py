@@ -14,10 +14,10 @@ class BigEndian(object):
 	name = 'Big Endian'
 	@staticmethod
 	def int4(b, i=0):
-		return ord(b[i+3]) + (ord(b[i+2])<<8) + (ord(b[i+1])<<16) + (ord(b[i])<<24)
+		return b[i+3] + (b[i+2]<<8) + (b[i+1]<<16) + (b[i]<<24)
 	@staticmethod
 	def int2(b, i=0):
-		return ord(b[i+1]) + (ord(b[i])<<8)
+		return b[i+1] + (b[i]<<8)
 	@staticmethod
 	def str4(n):
 		return ''.join((chr((n>>24)&255), chr((n>>16)&255), chr((n>>8)&255), chr(n&255)))
@@ -29,10 +29,10 @@ class LittleEndian(object):
 	name = 'Little Endian'
 	@staticmethod
 	def int4(b, i=0):
-		return ord(b[i]) + (ord(b[i+1])<<8) + (ord(b[i+2])<<16) + (ord(b[i+3])<<24)
+		return b[i] + (b[i+1]<<8) + (b[i+2]<<16) + (b[i+3]<<24)
 	@staticmethod
 	def int2(b, i=0):
-		return ord(b[i]) + (ord(b[i+1])<<8)
+		return b[i] + (b[i+1]<<8)
 	@staticmethod
 	def str4(n):
 		return ''.join((chr(n&255), chr((n>>8)&255), chr((n>>16)&255), chr((n>>24)&255)))
@@ -47,10 +47,10 @@ def sInt4(n):
 	return n - (1 << 32) if (n >> 31) == 1 else n
 
 def escapeString(s):
-	return ''.join([c if 32 <= ord(c) <= 126 else '\\x{:02X}'.format(ord(c)) for c in s])
+	return ''.join([chr(c) if 32 <= c <= 126 else '\\x{:02X}'.format(c) for c in s])
 
 def stringBytes(s):
-	return ' '.join([str(ord(c)) for c in s])
+	return ' '.join([str(c) for c in s])
 
 # PNG Spec: https://www.w3.org/TR/PNG/
 
@@ -60,7 +60,7 @@ def pngReadChunk(b, f):
 	chunkLength = BigEndian.int4(b)
 	chunkType = b[4:8]
 
-	if chunkType == 'IDAT':
+	if chunkType == b'IDAT':
 		return 'IEND', '', ''
 
 	# Read chunk data + CRC (4 bytes) + next chunk's length (4 bytes) and type (4 bytes)
@@ -73,19 +73,19 @@ def pngReadChunk(b, f):
 	return chunkType, chunkData, b
 
 def pngReadChunks(image, b, f):
-	while b != '':
+	while b:
 		chunkType, chunkData, b = pngReadChunk(b, f)
 
-		if chunkType == 'iTXt':
-			if chunkData[:22] == 'XML:com.adobe.xmp\x00\x00\x00\x00\x00':
+		if chunkType == b'iTXt':
+			if chunkData[:22] == b'XML:com.adobe.xmp\x00\x00\x00\x00\x00':
 				image.xmpData = chunkData[22:]
 
-	assert chunkType == 'IEND'
-	assert chunkData == ''
+	assert chunkType == b'IEND'
+	assert chunkData == b''
 
 def pngReadHeader(image, b, f):
 	chunkType, chunkData, b = pngReadChunk(b, f)
-	assert chunkType == 'IHDR'
+	assert chunkType == b'IHDR'
 	width = BigEndian.int4(chunkData)
 	height = BigEndian.int4(chunkData, 4)
 	image.size = (width, height)
@@ -96,13 +96,13 @@ def pngReadHeader(image, b, f):
 # IFD = Image File Directory
 
 def exifReadByte(b, offset, count):
-	return [ord(b[i]) for i in range(offset, offset + count)]
+	return [b[i] for i in range(offset, offset + count)]
 
 def exifReadAscii(b, offset, count):
 	value = b[offset : offset + count]
-	if value[-1] != '\x00':
+	if value[-1] != 0:
 		print('ASCII value not terminated with NULL:', escapeString(value), file=sys.stderr)
-	return value.rstrip('\x00\t\n\r ')
+	return value.rstrip(b'\x00\t\n\r ')
 
 def exifReadShort(b, offset, count):
 	return [E.int2(b, i) for i in range(offset, offset + count*2, 2)]
@@ -177,8 +177,8 @@ def toStrMakerNote(value):
 	if isinstance(value, list):
 		return toStrInteger(value)
 
-	if value.startswith('Apple iOS\x00'):
-		assert value[12:14] == 'MM'
+	if value.startswith(b'Apple iOS\x00'):
+		assert value[12:14] == b'MM'
 		assert E is BigEndian
 		assert E.int2(value, 10) == 1
 
@@ -331,7 +331,7 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 		tagEnd = ': '
 		valEnd = '\n'
 
-	for tagData in sorted(ifdData.itervalues(), key=operator.attrgetter('name')):
+	for tagData in sorted(ifdData.values(), key=operator.attrgetter('name')):
 
 		value = tagData.value
 		valueType = tagData.valueType
@@ -360,8 +360,8 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 		print()
 
 badExifOffset = {
-	('2010:07:24 14:25:32', 194): 12, # IMG_0317.JPG
-	('2010:07:24 14:25:56', 194): 12, # IMG_0318.JPG
+	(b'2010:07:24 14:25:32', 194): 12, # IMG_0317.JPG
+	(b'2010:07:24 14:25:56', 194): 12, # IMG_0318.JPG
 }
 
 def exifReadIFD(b, i, ifdInfo):
@@ -410,10 +410,10 @@ def exifReadIFD(b, i, ifdInfo):
 def exifRead(b):
 	global E
 
-	if b[0:2] == 'II':
+	if b[0:2] == b'II':
 		E = LittleEndian
 	else:
-		assert b[0:2] == 'MM'
+		assert b[0:2] == b'MM'
 		E = BigEndian
 
 	assert E.int2(b, 2) == 42
@@ -438,9 +438,9 @@ def jpegReadSegments(image, f):
 	f.seek(0) # Rewind to the beginning of the file
 
 	b = f.read(2)
-	while b != '':
-		assert b[0] == '\xFF'
-		marker = ord(b[1])
+	while b:
+		assert b[0] == 0xFF
+		marker = b[1]
 		b = f.read(2)
 
 		if 0xD0 <= marker <= 0xD9:
@@ -460,7 +460,7 @@ def jpegReadSegments(image, f):
 		if marker == 0xE1:
 			b = f.read(6)
 			segmentLength -= 6
-			if b == 'Exif\x00\x00':
+			if b == b'Exif\x00\x00':
 				image.exifOffset = f.tell()
 				b = f.read(segmentLength)
 				image.exifData = exifRead(b)
@@ -484,13 +484,13 @@ class Image(object):
 
 		with open(filename, 'rb') as f:
 			b = f.read(16)
-			if b[:4] == '\xFF\xD8\xFF\xE1' and b[6:11] == 'Exif\x00':
+			if b[:4] == b'\xFF\xD8\xFF\xE1' and b[6:11] == b'Exif\x00':
 				jpegReadSegments(self, f)
 
-			elif b[:4] == '\xFF\xD8\xFF\xE0' and b[6:11] == 'JFIF\x00':
+			elif b[:4] == b'\xFF\xD8\xFF\xE0' and b[6:11] == b'JFIF\x00':
 				jpegReadSegments(self, f)
 
-			elif b[:8] == '\x89PNG\r\n\x1A\n':
+			elif b[:8] == b'\x89PNG\r\n\x1A\n':
 				pngReadHeader(self, b[8:], f)
 
 	def getTimeCreated(self):
@@ -576,8 +576,8 @@ def setOrientation(image, args):
 		newFile.write(oldFile.read(image.exifOffset + tagData.offset))
 		oldFile.read(2)
 
-		b = E.str2(newValue)
-		while b != '':
+		b = E.str2(newValue).encode()
+		while b:
 			newFile.write(b)
 			b = oldFile.read(1<<12)
 
