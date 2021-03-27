@@ -61,7 +61,7 @@ def pngReadChunk(b, f):
 	chunkType = b[4:8]
 
 	if chunkType == b'IDAT':
-		return 'IEND', '', ''
+		return b'IEND', b'', b''
 
 	# Read chunk data + CRC (4 bytes) + next chunk's length (4 bytes) and type (4 bytes)
 	b = f.read(chunkLength + 12)
@@ -78,7 +78,7 @@ def pngReadChunks(image, b, f):
 
 		if chunkType == b'iTXt':
 			if chunkData[:22] == b'XML:com.adobe.xmp\x00\x00\x00\x00\x00':
-				image.xmpData = chunkData[22:]
+				image.xmpData = chunkData[22:].decode()
 
 	assert chunkType == b'IEND'
 	assert chunkData == b''
