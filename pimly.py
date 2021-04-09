@@ -102,7 +102,7 @@ def exifReadAscii(b, offset, count):
 	value = b[offset : offset + count]
 	if value[-1] != 0:
 		print('ASCII value not terminated with NULL:', escapeString(value), file=sys.stderr)
-	return value.rstrip(b'\x00\t\n\r ')
+	return value.rstrip(b'\x00\t\n\r ').decode()
 
 def exifReadShort(b, offset, count):
 	return [E.int2(b, i) for i in range(offset, offset + count*2, 2)]
