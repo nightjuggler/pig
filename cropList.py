@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import os
 
 def writeCropList(imageDir):

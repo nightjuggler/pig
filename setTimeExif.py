@@ -1,4 +1,3 @@
-#!python3
 import os
 import time
 from pimly import Image
