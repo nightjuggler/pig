@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import operator
 import optparse
 import os
@@ -14,7 +13,7 @@ def format_ar(kind, aspect_ratio):
 
 def check_ar(name, kind1, ar1, kind2, ar2):
 	if ar1 != ar2:
-		print format_ar(kind1, ar1), 'for "{}" not equal to'.format(name), format_ar(kind2, ar2)
+		print(format_ar(kind1, ar1), 'for "{}" not equal to'.format(name), format_ar(kind2, ar2))
 
 def adjust_time(timestamp, spec):
 	if timestamp > spec.time_adjust_cutoff:
@@ -57,7 +56,7 @@ class ImageInfo(object):
 		original_image = Image(original_filename)
 
 		original_info = ['{}x{}'.format(*original_image.size),
-			'{:.1f}MB'.format(stat_object.st_size / 1024.0 / 1024)]
+			'{:.1f}MB'.format(stat_object.st_size / 1024 / 1024)]
 
 		timestamp = original_image.getTimeCreated()
 		if timestamp == 0:
@@ -117,7 +116,7 @@ def print_image_pages(images):
 			next_page = 1
 			right_arrow = ''
 
-		index_page_number = (image_number - 1) / thumbs_per_page + 1
+		index_page_number = (image_number - 1) // thumbs_per_page + 1
 
 		caption = image.spec.captions.get(image.name)
 		if caption is None:
@@ -127,8 +126,8 @@ def print_image_pages(images):
 
 		width, height = Image(os.path.join(image.dir.images, image.name)).size
 		if (width, height) != (image.width, image.height):
-			print 'Changing image size for {} from {}x{} to {}x{}'.format(image.name,
-				image.width, image.height, width, height)
+			print('Changing image size for {} from {}x{} to {}x{}'.format(image.name,
+				image.width, image.height, width, height))
 			image.width, image.height = width, height
 
 		template_vars = {
@@ -205,7 +204,7 @@ def print_thumb_pages(images):
 	thumb_rows = global_spec.thumb_rows
 
 	thumbs_per_page = thumb_cols * thumb_rows
-	num_pages = (len(images) + thumbs_per_page - 1) / thumbs_per_page
+	num_pages = (len(images) + thumbs_per_page - 1) // thumbs_per_page
 
 	td_format = (
 		'<td><a href="%(page)s#c">'
@@ -223,8 +222,8 @@ def print_thumb_pages(images):
 
 		width, height = Image(os.path.join(image.dir.thumbs, image.name)).size
 		if (width, height) != (image.thumb_width, image.thumb_height):
-			print 'Changing thumb size for {} from {}x{} to {}x{}'.format(image.name,
-				image.thumb_width, image.thumb_height, width, height)
+			print('Changing thumb size for {} from {}x{} to {}x{}'.format(image.name,
+				image.thumb_width, image.thumb_height, width, height))
 			image.thumb_width, image.thumb_height = width, height
 
 		td_vars = {
@@ -257,7 +256,7 @@ def convert(in_path, out_path, conversions):
 	command[2:2] = conversions
 	command = ' '.join(command)
 
-	print command
+	print(command)
 	os.system(command)
 
 def convert_all(images, options):
@@ -328,7 +327,7 @@ def get_images(d):
 		try:
 			time_adjust_cutoff = time.mktime(time.strptime(time_adjust_cutoff, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:
-			print 'Cannot parse time_adjust_cutoff for "{}"'.format(originals)
+			print('Cannot parse time_adjust_cutoff for "{}"'.format(originals))
 			time_adjust_cutoff = 0
 	spec.time_adjust_cutoff = time_adjust_cutoff
 
