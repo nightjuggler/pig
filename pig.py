@@ -1,6 +1,7 @@
-import operator
 import argparse
+import operator
 import os
+import subprocess
 import time
 
 from pimly import Image
@@ -117,11 +118,8 @@ def print_image_pages(images):
 			next_page = 1
 			right_arrow = ''
 
-		caption = image.spec.captions.get(image.name)
-		if caption is None:
-			caption = ''
-		else:
-			caption = '<p class="caption">{}</p>\n'.format(caption)
+		if caption := image.spec.captions.get(image.name, ''):
+			caption = f'<p class="caption">{caption}</p>\n'
 
 		width, height = Image(os.path.join(image.dir.images, image.name)).size
 		if (width, height) != (image.width, image.height):
@@ -227,12 +225,9 @@ def print_thumb_pages(images):
 		print_index_page(index_template, table_data, page_number + 1, num_pages)
 
 def convert(in_path, out_path, conversions):
-	command = ['/usr/local/bin/magick', in_path, out_path]
-	command[2:2] = conversions
-	command = ' '.join(command)
-
-	print(command)
-	os.system(command)
+	command = ['/usr/local/bin/magick', in_path, *conversions, out_path]
+	print(*command)
+	subprocess.run(command)
 
 def convert_all(images, options):
 	for image in images:
