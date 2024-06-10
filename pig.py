@@ -1,12 +1,18 @@
 import operator
-import optparse
+import argparse
 import os
 import time
 
 from pimly import Image
 import spec as global_spec
 
-page_path_format = 'page%03u.html'
+def page_path(n): return f'page{n:03}.html'
+def index_path(n): return 'index.html' if n == 1 else f'index{n:02}.html'
+
+def page_link(page, text, prefix, suffix):
+	return f'{prefix}<a href="{page_path(page)}">({text})</a>{suffix}'
+def index_link(page, text, prefix, suffix):
+	return f'{prefix}(<a href="{index_path(page)}">{text}</a>){suffix}'
 
 def format_ar(kind, aspect_ratio):
 	return '{} aspect ratio ({}:{})'.format(kind, *aspect_ratio)
@@ -19,7 +25,7 @@ def adjust_time(timestamp, spec):
 	if timestamp > spec.time_adjust_cutoff:
 		timestamp += spec.time_adjust
 
-	(year, month, day, hour, minute) = time.localtime(timestamp)[0:5]
+	year, month, day, hour, minute = time.localtime(timestamp)[:5]
 
 	if hour < 12:
 		suffix = 'am'
@@ -30,20 +36,20 @@ def adjust_time(timestamp, spec):
 		if hour > 12:
 			hour -= 12
 
-	display_time = '%u-%u-%02u %u:%02u%s' % (month, day, year % 100, hour, minute, suffix)
+	display_time = f'{month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
 	return timestamp, display_time
 
 def get_greatest_common_divisor(a, b):
-	while b != 0:
+	while b:
 		a, b = b, a % b
 	return a
 
 def get_aspect_ratio(w, h):
 	gcd = get_greatest_common_divisor(w, h)
-	return (w/gcd, h/gcd)
+	return w/gcd, h/gcd
 
 def get_dimensions(spec_height, ar_width, ar_height):
-	return int(float(spec_height) * ar_width / ar_height + 0.5), spec_height
+	return int(spec_height * ar_width / ar_height + 0.5), spec_height
 
 class ImageInfo(object):
 	def __init__(self, name, spec, dir_spec):
@@ -66,7 +72,7 @@ class ImageInfo(object):
 			original_info.append(display_time)
 
 		self.original_info = ', '.join(original_info)
-		self.time_and_name = (timestamp, name)
+		self.time_and_name = timestamp, name
 
 		width, height = original_image.size
 		if width < height:
@@ -87,9 +93,8 @@ class ImageInfo(object):
 		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 
 def print_image_pages(images):
-	page_template_file = open('page_template.html')
-	page_template = page_template_file.read()
-	page_template_file.close()
+	with open('page_template.html') as f:
+		page_template = f.read()
 
 	thumbs_per_page = global_spec.thumb_cols * global_spec.thumb_rows
 
@@ -97,26 +102,20 @@ def print_image_pages(images):
 	for image_number, image in enumerate(images, start=1):
 		if image_number > 1:
 			prev_page = image_number - 1
-			page_path = page_path_format % prev_page
-			left_arrow = '<a href="{}#c">(Previous)</a> '.format(page_path)
+			left_arrow = page_link(prev_page, 'Previous', '', ' ')
 			if prev_page > 1:
-				page_path = page_path_format % 1
-				left_arrow = '<a href="{}#c">(First)</a> '.format(page_path) + left_arrow
+				left_arrow = page_link(1, 'First', '', ' ') + left_arrow
 		else:
 			prev_page = num_images
 			left_arrow = ''
 		if image_number < num_images:
 			next_page = image_number + 1
-			page_path = page_path_format % next_page
-			right_arrow = ' <a href="{}#c">(Next)</a>'.format(page_path)
+			right_arrow = page_link(next_page, 'Next', ' ', '')
 			if next_page < num_images:
-				page_path = page_path_format % num_images
-				right_arrow += ' <a href="{}#c">(Last)</a>'.format(page_path)
+				right_arrow += page_link(num_images, 'Last', ' ', '')
 		else:
 			next_page = 1
 			right_arrow = ''
-
-		index_page_number = (image_number - 1) // thumbs_per_page + 1
 
 		caption = image.spec.captions.get(image.name)
 		if caption is None:
@@ -133,72 +132,48 @@ def print_image_pages(images):
 		template_vars = {
 			'title': global_spec.title,
 			'date': global_spec.date,
-			'number': '%u/%u' % (image_number, num_images),
+			'number': f'{image_number}/{num_images}',
 			'dir': image.dir.images,
 			'name': image.name,
 			'width': image.width,
 			'height': image.height,
-			'next_page': page_path_format % next_page,
-			'index_page': get_index_path(index_page_number),
+			'next_page': page_path(next_page),
+			'index_page': index_path((image_number - 1) // thumbs_per_page + 1),
 			'left_arrow': left_arrow,
 			'right_arrow': right_arrow,
 			'original_info': image.original_info,
 			'original_dir': image.dir.originals,
 			'caption': caption,
 		}
-		page_path = page_path_format % image_number
-		page_file = open(page_path, 'w')
-		page_file.write(page_template % template_vars)
-		page_file.close()
+		with open(page_path(image_number), 'w') as f:
+			f.write(page_template % template_vars)
 
-def get_index_path(page_number):
-	if page_number == 1:
-		return 'index.html'
-
-	return 'index%02u.html' % page_number
-
-def print_index_page(index_template, table_data, page_number, num_pages):
-	if page_number > 2:
-		first_link = '(<a href="{}">First</a>) '.format(get_index_path(1))
-	else:
-		first_link = ''
-	if page_number > 1:
-		previous_link = '(<a href="{}">Previous</a>) '.format(get_index_path(page_number - 1))
-	else:
-		previous_link = ''
-
-	if page_number < num_pages - 1:
-		last_link = ' (<a href="{}">Last</a>)'.format(get_index_path(num_pages))
-	else:
-		last_link = ''
-	if page_number < num_pages:
-		next_link = ' (<a href="{}">Next</a>)'.format(get_index_path(page_number + 1))
-	else:
-		next_link = ''
-
-	if num_pages > 1:
-		page_number_str = '%u/%u' % (page_number, num_pages)
-		pager = '<p>{}{}{}{}{}</p>'.format(first_link, previous_link, page_number_str, next_link, last_link)
-	else:
-		page_number_str = ''
+def print_index_page(index_template, table_data, page, last_page):
+	if last_page == 1:
+		page_str = ''
 		pager = ''
-
+	else:
+		page_str = f'{page}/{last_page}'
+		pager = ''.join(['<p>',
+			'' if page <= 2 else index_link(1, 'First', '', ' '),
+			'' if page == 1 else index_link(page - 1, 'Previous', '', ' '),
+			page_str,
+			'' if page == last_page else index_link(page + 1, 'Next', ' ', ''),
+			'' if page >= last_page-1 else index_link(last_page, 'Last', ' ', ''),
+			'</p>'])
 	template_vars = {
 		'title': global_spec.title,
 		'date': global_spec.date,
-		'number': page_number_str,
+		'number': page_str,
 		'table_data': '\n'.join(table_data),
 		'pager': pager,
 	}
-
-	index_file = open(get_index_path(page_number), 'w')
-	index_file.write(index_template % template_vars)
-	index_file.close()
+	with open(index_path(page), 'w') as f:
+		f.write(index_template % template_vars)
 
 def print_thumb_pages(images):
-	index_template_file = open('index_template.html')
-	index_template = index_template_file.read()
-	index_template_file.close()
+	with open('index_template.html') as f:
+		index_template = f.read()
 
 	thumb_cols = global_spec.thumb_cols
 	thumb_rows = global_spec.thumb_rows
@@ -206,9 +181,9 @@ def print_thumb_pages(images):
 	thumbs_per_page = thumb_cols * thumb_rows
 	num_pages = (len(images) + thumbs_per_page - 1) // thumbs_per_page
 
-	td_format = (
-		'<td><a href="%(page)s#c">'
-		'<img src="%(dir)s/%(name)s" width="%(width)u" height="%(height)u">'
+	td_template = (
+		'<td><a href="{page}">'
+		'<img src="{dir}/{name}" width="{width}" height="{height}">'
 		'</a></td>'
 	)
 
@@ -231,9 +206,9 @@ def print_thumb_pages(images):
 			'name': image.name,
 			'width': image.thumb_width,
 			'height': image.thumb_height,
-			'page': page_path_format % image_number,
+			'page': page_path(image_number),
 		}
-		table_data.append(td_format % td_vars)
+		table_data.append(td_template.format_map(td_vars))
 		col += 1
 		if col == thumb_cols:
 			table_data.append('</tr>')
@@ -358,8 +333,7 @@ def get_images(d):
 		for image_name, crop_geometry in crop_list:
 			crop_count = crop_count_map.get(image_name, 1)
 			crop_count_map[image_name] = crop_count + 1
-			crop_image_name = '%s_%u%s' % (image_name[:-4], crop_count, image_name[-4:])
-
+			crop_image_name = f'{image_name[:-4]}_{crop_count}{image_name[-4:]}'
 			crop_path = os.path.join(crop_dir.originals, crop_image_name)
 
 			if not os.path.exists(crop_path):
@@ -392,7 +366,7 @@ def run(options):
 	images.sort(key=operator.attrgetter(sort_attr))
 
 	if options.images:
-		image_names = options.images.split()
+		image_names = set(options.images.split())
 		images = [image for image in images if image.name in image_names]
 		options.image_pages = False
 		options.thumb_pages = False
@@ -413,52 +387,17 @@ def run(options):
 		print_thumb_pages(images)
 		os.chdir('..')
 
+def main():
+	parser = argparse.ArgumentParser(allow_abbrev=False)
+	parser.add_argument('--no-convert', dest='convert', action='store_false')
+	parser.add_argument('--no-convert-images', dest='convert_images', action='store_false')
+	parser.add_argument('--no-convert-thumbs', dest='convert_thumbs', action='store_false')
+	parser.add_argument('--normalize-all', action='store_true')
+	parser.add_argument('--images', action='store')
+	parser.add_argument('--no-image-pages', dest='image_pages', action='store_false')
+	parser.add_argument('--no-thumb-pages', dest='thumb_pages', action='store_false')
+	parser.add_argument('--no-best', dest='best', action='store_false')
+	run(parser.parse_args())
+
 if __name__ == '__main__':
-	option_parser = optparse.OptionParser()
-	option_parser.set_defaults(
-		convert=True,
-		convert_images=True,
-		convert_thumbs=True,
-		normalize_all=False,
-		images=None,
-		image_pages=True,
-		thumb_pages=True,
-		best=True,
-		)
-
-	option_parser.add_option('--no-convert',
-		action='store_false',
-		dest='convert',
-		)
-	option_parser.add_option('--no-convert-images',
-		action='store_false',
-		dest='convert_images',
-		)
-	option_parser.add_option('--no-convert-thumbs',
-		action='store_false',
-		dest='convert_thumbs',
-		)
-	option_parser.add_option('--normalize-all',
-		action='store_true',
-		dest='normalize_all',
-		)
-	option_parser.add_option('--images',
-		action='store',
-		dest='images',
-		)
-	option_parser.add_option('--no-image-pages',
-		action='store_false',
-		dest='image_pages',
-		)
-	option_parser.add_option('--no-thumb-pages',
-		action='store_false',
-		dest='thumb_pages',
-		)
-	option_parser.add_option('--no-best',
-		action='store_false',
-		dest='best',
-		)
-
-	options, args = option_parser.parse_args()
-
-	run(options)
+	main()
