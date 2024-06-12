@@ -47,7 +47,7 @@ def sInt4(n):
 def escapeString(s):
 	if isinstance(s, str):
 		s = s.encode()
-	return ''.join([chr(c) if 32 <= c <= 126 else '\\x{:02X}'.format(c) for c in s])
+	return ''.join([chr(c) if 32 <= c <= 126 else f'\\x{c:02X}' for c in s])
 
 def stringBytes(s):
 	return ' '.join([str(c) for c in s])
@@ -122,11 +122,14 @@ def exifReadSignedLong(b, offset, count):
 def exifReadSignedRational(b, offset, count):
 	return [(sInt4(E.int4(b, i)), sInt4(E.int4(b, i+4))) for i in range(offset, offset + count*8, 8)]
 
+def toStrUnknown(value):
+	return f'[Unrecognized type {value}]'
+
 def toStrInteger(value):
 	return ' '.join([str(v) for v in value])
 
 def toStrRational(value):
-	return ' '.join(['{}/{}'.format(n, d) for n, d in value])
+	return ' '.join([f'{n}/{d}' for n, d in value])
 
 def toStrUndefined(value):
 	if len(value) <= 10:
@@ -143,6 +146,7 @@ class ExifType(object):
 		self.toStr = toStr
 		self.lookup[key] = self
 
+ExifTypeUnknown        = ExifType( 0, None,                   toStrUnknown,   None)
 ExifTypeByte           = ExifType( 1, exifReadByte,           toStrInteger,   1)
 ExifTypeAscii          = ExifType( 2, exifReadAscii,          escapeString,   1)
 ExifTypeShort          = ExifType( 3, exifReadShort,          toStrInteger,   2)
@@ -192,16 +196,16 @@ def toStrMakerNote(value):
 
 def toStrDegrees(value):
 	(n, d), = value
-	return '{}/{} ({:.2f} degrees)'.format(n, d, float(n)/d)
+	return f'{n}/{d} ({n/d:.2f} degrees)'
 
 def toStrDegMinSec(value):
 	(d1, d2), (m1, m2), (s1, s2) = value
-	degrees = float(d1)/d2 + float(m1)/m2/60 + float(s1)/s2/3600
-	return '{}/{} {}/{} {}/{} ({:.6f} degrees)'.format(d1, d2, m1, m2, s1, s2, degrees)
+	degrees = d1/d2 + m1/m2/60 + s1/s2/3600
+	return f'{d1}/{d2} {m1}/{m2} {s1}/{s2} ({degrees:.6f} degrees)'
 
 def toStrAltitude(value):
 	(n, d), = value
-	return '{}/{} ({:.1f} meters)'.format(n, d, float(n)/d)
+	return f'{n}/{d} ({n/d:.1f} meters)'
 
 exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	270: ExifTagInfo('ImageDescription'),
@@ -343,7 +347,7 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 		value = tagData.value
 		valueType = tagData.valueType
 
-		if valueType is None:
+		if not valueType:
 			if not oneLine:
 				print(indent, tagData.name, sep='', end=':\n')
 
@@ -352,7 +356,7 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 
 		print(indent, tagData.name, sep='', end=tagEnd)
 
-		if tagData.toStr is not None:
+		if tagData.toStr:
 			value = tagData.toStr(value)
 			if isinstance(value, dict):
 				print(end=valEnd)
@@ -382,19 +386,17 @@ def exifReadIFD(b, i, ifdInfo):
 		valueType = E.int2(b, i+2)
 		typeInfo = ExifType.lookup.get(valueType)
 
-		if typeInfo is None:
-			print(f'Skipping unrecognized type {valueType} for tag {tag}', file=sys.stderr)
-			i += 12
-			n -= 1
-			continue
-
 		count = E.int4(b, i+4)
 		i += 8
 
-		tagInfo = ifdInfo.setdefault(tag, ExifTagInfo(tag))
+		if not (tagInfo := ifdInfo.get(tag)):
+			ifdInfo[tag] = tagInfo = ExifTagInfo(tag)
 		ifdData[tag] = tagData = ExifTagData(tagInfo)
 
-		if tagInfo.subIFD is None:
+		if not typeInfo:
+			tagData.valueType = ExifTypeUnknown
+			tagData.value = valueType
+		elif not tagInfo.subIFD:
 			tagData.valueType = typeInfo
 			tagData.offset = offset = E.int4(b, i) if typeInfo.size * count > 4 else i
 			tagData.value = typeInfo.read(b, offset, count)
