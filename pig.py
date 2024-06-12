@@ -53,29 +53,26 @@ def get_dimensions(spec_height, ar_width, ar_height):
 	return int(spec_height * ar_width / ar_height + 0.5), spec_height
 
 class ImageInfo(object):
+	images = []
 	def __init__(self, name, spec, dir_spec):
 		self.name = name
 		self.spec = spec
 		self.dir = dir_spec
 
-		original_filename = os.path.join(dir_spec.originals, name)
-		stat_object = os.stat(original_filename)
-		original_image = Image(original_filename)
+		path = os.path.join(dir_spec.originals, name)
+		stat = os.stat(path)
+		image = Image(path)
+		width, height = image.size
 
-		original_info = ['{}x{}'.format(*original_image.size),
-			'{:.1f}MB'.format(stat_object.st_size / 1024 / 1024)]
+		info = [f'{width}x{height}', f'{stat.st_size/1024/1024:.1f}MB']
 
-		timestamp = original_image.getTimeCreated()
-		if timestamp == 0:
-			timestamp = stat_object.st_mtime
-		if timestamp > 0:
+		if timestamp := image.getTimeCreated() or stat.st_mtime:
 			timestamp, display_time = adjust_time(timestamp, spec)
-			original_info.append(display_time)
+			info.append(display_time)
 
-		self.original_info = ', '.join(original_info)
+		self.original_info = ', '.join(info)
 		self.time_and_name = timestamp, name
 
-		width, height = original_image.size
 		if width < height:
 			aspect_ratio = get_aspect_ratio(height, width)
 			self.height, self.width = get_dimensions(spec.height, *aspect_ratio)
@@ -85,13 +82,22 @@ class ImageInfo(object):
 			self.width, self.height = get_dimensions(spec.height, *aspect_ratio)
 			self.thumb_width, self.thumb_height = get_dimensions(spec.thumb_height, *aspect_ratio)
 
+		check_ar(path, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
 		self.resize_width = self.width
-
-		check_ar(original_filename, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
+		self.images.append(self)
 
 	def rotate90(self):
 		self.width, self.height = self.height, self.width
 		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
+
+	@classmethod
+	def sort(cls):
+		if getattr(global_spec, 'sort_by_time', False):
+			sort_attr = 'time_and_name'
+		else:
+			sort_attr = 'name'
+		cls.images.sort(key=operator.attrgetter(sort_attr))
+		return cls.images
 
 def print_image_pages(images):
 	with open('page_template.html') as f:
@@ -257,16 +263,17 @@ def convert_all(images, options):
 		if options.convert_thumbs and not os.path.exists(thumb_path):
 			convert(image_path, thumb_path, ['-strip', '-resize', str(image.thumb_width)])
 
+def mkdir(name):
+	if not os.path.exists(name):
+		os.mkdir(name)
+
 class DirSpec(object):
 	def __init__(self, suffix):
 		self.originals = 'originals' + suffix
 		self.images = 'images' + suffix
 		self.thumbs = 'thumbs' + suffix
-
-		if not os.path.exists(self.images):
-			os.mkdir(self.images)
-		if not os.path.exists(self.thumbs):
-			os.mkdir(self.thumbs)
+		mkdir(self.images)
+		mkdir(self.thumbs)
 
 class SharedSpec(object):
 	def __init__(self, d):
@@ -282,11 +289,13 @@ class SharedSpec(object):
 		self.thumb_width = d.get('thumb_width', global_spec.thumb_width)
 		self.thumb_height = d.get('thumb_height', global_spec.thumb_height)
 
-def get_images(d):
+def add_images(d):
 	dir_suffix = d.get('dir_suffix', '')
 	dir_spec = DirSpec(dir_suffix)
 	originals = dir_spec.originals
 	spec = SharedSpec(d)
+	skip = frozenset(d.get('skip', ()))
+	convert_list = []
 
 	spec.aspect_ratio = get_aspect_ratio(spec.width, spec.height)
 	thumb_aspect_ratio = get_aspect_ratio(spec.thumb_width, spec.thumb_height)
@@ -308,65 +317,53 @@ def get_images(d):
 			('rotate_180', ('180', False)))
 				for name in d.get(attr, ())}
 
-	skip = frozenset(d.get('skip', ()))
-	images = [ImageInfo(name, spec, dir_spec) for name in os.listdir(originals)
-		if name not in skip and name[-4:] in ('.JPG', '.jpg', '.PNG', '.png')]
-
-	for image in images:
-		image.rotate, rotate90 = rotate_info.get(image.name, (None, False))
+	def add_image(name, orig_name):
+		image = ImageInfo(name, spec, dir_spec)
+		image.rotate, rotate90 = rotate_info.get(orig_name, (None, False))
 		if rotate90:
 			image.rotate90()
 
-	crop_list = d.get('crop')
-	if crop_list:
-		crop_dir = DirSpec(dir_suffix + '_cropped')
+	for name in sorted(os.listdir(originals)):
+		if name in skip:
+			continue
+		elif name.endswith('.HEIC'):
+			convert_list.append(name)
+		elif name.endswith(('.JPG', '.jpg', '.PNG', '.png')):
+			add_image(name, name)
 
-		if not os.path.exists(crop_dir.originals):
-			os.mkdir(crop_dir.originals)
+	def convert_orig(name, new_name, conversions):
+		new_path = os.path.join(dir_spec.originals, new_name)
+		if not os.path.exists(new_path):
+			path = os.path.join(originals, name)
+			stat = os.stat(path)
+			convert(path, new_path, conversions)
+			os.utime(new_path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+		add_image(new_name, name)
+
+	if convert_list:
+		dir_spec = DirSpec(dir_suffix)
+		dir_spec.originals += '_converted'
+		mkdir(dir_spec.originals)
+
+		for name in convert_list:
+			convert_orig(name, os.path.splitext(name)[0] + '.JPG', [])
+
+	if crop_list := d.get('crop'):
+		dir_spec = DirSpec(dir_suffix + '_cropped')
+		mkdir(dir_spec.originals)
 
 		crop_count_map = {}
-		for image_name, crop_geometry in crop_list:
-			crop_count = crop_count_map.get(image_name, 1)
-			crop_count_map[image_name] = crop_count + 1
-			crop_image_name = f'{image_name[:-4]}_{crop_count}{image_name[-4:]}'
-			crop_path = os.path.join(crop_dir.originals, crop_image_name)
-
-			if not os.path.exists(crop_path):
-				original_path = os.path.join(originals, image_name)
-
-				convert(original_path, crop_path, ['-crop', crop_geometry])
-
-				original_stat = os.stat(original_path)
-				os.utime(crop_path, (original_stat.st_atime, original_stat.st_mtime))
-
-			crop_image = ImageInfo(crop_image_name, spec, crop_dir)
-			crop_image.rotate, rotate90 = rotate_info.get(image_name, (None, False))
-			if rotate90:
-				crop_image.rotate90()
-
-			images.append(crop_image)
-
-	return images
+		for name, geometry in crop_list:
+			crop_count = crop_count_map.get(name, 1)
+			crop_count_map[name] = crop_count + 1
+			convert_orig(name, f'{name[:-4]}_{crop_count}{name[-4:]}', ['-crop', geometry])
 
 def run(options):
-	images = get_images(vars(global_spec))
+	add_images(vars(global_spec))
 	for spec in getattr(global_spec, 'more_photos', ()):
-		images.extend(get_images(spec))
+		add_images(spec)
 
-	if getattr(global_spec, 'sort_by_time', False):
-		sort_attr = 'time_and_name'
-	else:
-		sort_attr = 'name'
-
-	images.sort(key=operator.attrgetter(sort_attr))
-
-	if options.images:
-		image_names = set(options.images.split())
-		images = [image for image in images if image.name in image_names]
-		options.image_pages = False
-		options.thumb_pages = False
-		options.best = False
-
+	images = ImageInfo.sort()
 	if options.convert:
 		convert_all(images, options)
 	if options.image_pages:
@@ -388,7 +385,6 @@ def main():
 	parser.add_argument('--no-convert-images', dest='convert_images', action='store_false')
 	parser.add_argument('--no-convert-thumbs', dest='convert_thumbs', action='store_false')
 	parser.add_argument('--normalize-all', action='store_true')
-	parser.add_argument('--images', action='store')
 	parser.add_argument('--no-image-pages', dest='image_pages', action='store_false')
 	parser.add_argument('--no-thumb-pages', dest='thumb_pages', action='store_false')
 	parser.add_argument('--no-best', dest='best', action='store_false')
