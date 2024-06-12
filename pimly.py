@@ -1,8 +1,6 @@
-#!python3
 #
 # pimly.py (Pius' Image Library)
 #
-import operator
 import os
 import re
 import sys
@@ -47,6 +45,8 @@ def sInt4(n):
 	return n - (1 << 32) if (n >> 31) == 1 else n
 
 def escapeString(s):
+	if isinstance(s, str):
+		s = s.encode()
 	return ''.join([chr(c) if 32 <= c <= 126 else '\\x{:02X}'.format(c) for c in s])
 
 def stringBytes(s):
@@ -165,6 +165,9 @@ class ExifTagData(object):
 		self.valueType = None
 		self.value = None
 
+	def sortkey(self):
+		return format(self.name, '05') if isinstance(self.name, int) else self.name
+
 def parseBPList(bplist):
 	return '{} ... [{}]'.format(bplist[:8], len(bplist))
 
@@ -182,8 +185,8 @@ def toStrMakerNote(value):
 		assert E is BigEndian
 		assert E.int2(value, 10) == 1
 
-		print('Apple iOS', end='')
-		return exifReadIFD(value, 14, appleIFD)
+#		print('Apple iOS', end='')
+#		return exifReadIFD(value, 14, appleIFD)
 
 	return toStrUndefined(value)
 
@@ -276,6 +279,7 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		41992: ExifTagInfo('Contrast'),
 		41993: ExifTagInfo('Saturation'),
 		41994: ExifTagInfo('Sharpness'),
+		41995: ExifTagInfo('DeviceSettingDescription'),
 		41996: ExifTagInfo('SubjectDistanceRange'),
 		42032: ExifTagInfo('CameraOwnerName'),
 		42033: ExifTagInfo('BodySerialNumber'),
@@ -283,6 +287,9 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		42035: ExifTagInfo('LensMake'),
 		42036: ExifTagInfo('LensModel'),
 		42037: ExifTagInfo('LensSerialNumber'),
+		42080: ExifTagInfo('CompositeImage'),
+		42081: ExifTagInfo('SourceImageNumberOfCompositeImage'),
+		42082: ExifTagInfo('SourceExposureTimesOfCompositeImage'),
 	}),
 	34853: ExifTagInfo('GPS IFD', subIFD={
 		0: ExifTagInfo('GPSVersionID', toStr=lambda v: '.'.join([str(i) for i in v])),
@@ -331,7 +338,7 @@ def exifPrintSorted(ifdData, level=0, oneLine=False):
 		tagEnd = ': '
 		valEnd = '\n'
 
-	for tagData in sorted(ifdData.values(), key=operator.attrgetter('name')):
+	for tagData in sorted(ifdData.values(), key=ExifTagData.sortkey):
 
 		value = tagData.value
 		valueType = tagData.valueType
@@ -376,8 +383,10 @@ def exifReadIFD(b, i, ifdInfo):
 		typeInfo = ExifType.lookup.get(valueType)
 
 		if typeInfo is None:
-			print('Unrecognized type', valueType, 'at offset', i+2, file=sys.stderr)
-			break
+			print(f'Skipping unrecognized type {valueType} for tag {tag}', file=sys.stderr)
+			i += 12
+			n -= 1
+			continue
 
 		count = E.int4(b, i+4)
 		i += 8
@@ -401,7 +410,6 @@ def exifReadIFD(b, i, ifdInfo):
 					offset += badExifOffset.get((dateTime.value, offset), 0)
 
 			tagData.value = exifReadIFD(b, offset, tagInfo.subIFD)
-
 		i += 4
 		n -= 1
 
