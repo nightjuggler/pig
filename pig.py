@@ -6,14 +6,10 @@ import time
 
 from pimly import Image
 import spec as global_spec
+import temple
 
 def page_path(n): return f'page{n:03}.html'
 def index_path(n): return 'index.html' if n == 1 else f'index{n:02}.html'
-
-def page_link(page, text, prefix, suffix):
-	return f'{prefix}<a href="{page_path(page)}">({text})</a>{suffix}'
-def index_link(page, text, prefix, suffix):
-	return f'{prefix}(<a href="{index_path(page)}">{text}</a>){suffix}'
 
 def format_ar(kind, aspect_ratio):
 	return '{} aspect ratio ({}:{})'.format(kind, *aspect_ratio)
@@ -22,10 +18,7 @@ def check_ar(name, kind1, ar1, kind2, ar2):
 	if ar1 != ar2:
 		print(format_ar(kind1, ar1), 'for "{}" not equal to'.format(name), format_ar(kind2, ar2))
 
-def adjust_time(timestamp, spec):
-	if timestamp > spec.time_adjust_cutoff:
-		timestamp += spec.time_adjust
-
+def format_time(timestamp):
 	year, month, day, hour, minute = time.localtime(timestamp)[:5]
 
 	if hour < 12:
@@ -37,8 +30,7 @@ def adjust_time(timestamp, spec):
 		if hour > 12:
 			hour -= 12
 
-	display_time = f'{month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
-	return timestamp, display_time
+	return f', {month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
 
 def get_greatest_common_divisor(a, b):
 	while b:
@@ -64,13 +56,12 @@ class ImageInfo(object):
 		image = Image(path)
 		width, height = image.size
 
-		info = [f'{width}x{height}', f'{stat.st_size/1024/1024:.1f}MB']
+		self.info = f'{width}x{height}, {stat.st_size/1024/1024:.1f}MB'
 
 		if timestamp := image.getTimeCreated() or stat.st_mtime:
-			timestamp, display_time = adjust_time(timestamp, spec)
-			info.append(display_time)
+			if timestamp > spec.time_adjust_cutoff: timestamp += spec.time_adjust
+			self.info += format_time(timestamp)
 
-		self.original_info = ', '.join(info)
 		self.time_and_name = timestamp, name
 
 		if width < height:
@@ -100,32 +91,37 @@ class ImageInfo(object):
 		return cls.images
 
 def print_image_pages(images):
-	with open('page_template.html') as f:
-		page_template = f.read()
-
+	template = temple.read('page_template.html')
 	thumbs_per_page = global_spec.thumb_cols * global_spec.thumb_rows
 
 	num_images = len(images)
 	for image_number, image in enumerate(images, start=1):
+		template_vars = {
+			'date': global_spec.date,
+			'title': global_spec.title,
+			'image': image,
+			'number': f'{image_number}/{num_images}',
+			'index_page': index_path((image_number - 1) // thumbs_per_page + 1),
+			'caption': image.spec.captions.get(image.name, ''),
+		}
+
 		if image_number > 1:
 			prev_page = image_number - 1
-			left_arrow = page_link(prev_page, 'Previous', '', ' ')
+			template_vars['prev_link'] = True
 			if prev_page > 1:
-				left_arrow = page_link(1, 'First', '', ' ') + left_arrow
+				template_vars['first_page'] = page_path(1)
 		else:
 			prev_page = num_images
-			left_arrow = ''
+		template_vars['prev_page'] = page_path(prev_page)
+
 		if image_number < num_images:
 			next_page = image_number + 1
-			right_arrow = page_link(next_page, 'Next', ' ', '')
+			template_vars['next_link'] = True
 			if next_page < num_images:
-				right_arrow += page_link(num_images, 'Last', ' ', '')
+				template_vars['last_page'] = page_path(num_images)
 		else:
 			next_page = 1
-			right_arrow = ''
-
-		if caption := image.spec.captions.get(image.name, ''):
-			caption = f'<p class="caption">{caption}</p>\n'
+		template_vars['next_page'] = page_path(next_page)
 
 		width, height = Image(os.path.join(image.dir.images, image.name)).size
 		if (width, height) != (image.width, image.height):
@@ -133,71 +129,40 @@ def print_image_pages(images):
 				image.width, image.height, width, height))
 			image.width, image.height = width, height
 
-		template_vars = {
-			'title': global_spec.title,
-			'date': global_spec.date,
-			'number': f'{image_number}/{num_images}',
-			'dir': image.dir.images,
-			'name': image.name,
-			'width': image.width,
-			'height': image.height,
-			'next_page': page_path(next_page),
-			'index_page': index_path((image_number - 1) // thumbs_per_page + 1),
-			'left_arrow': left_arrow,
-			'right_arrow': right_arrow,
-			'original_info': image.original_info,
-			'original_dir': image.dir.originals,
-			'caption': caption,
-		}
-		with open(page_path(image_number), 'w') as f:
-			f.write(page_template % template_vars)
+		temple.write(template, page_path(image_number), template_vars)
 
-def print_index_page(index_template, table_data, page, last_page):
-	if last_page == 1:
-		page_str = ''
-		pager = ''
-	else:
-		page_str = f'{page}/{last_page}'
-		pager = ''.join(['<p>',
-			'' if page <= 2 else index_link(1, 'First', '', ' '),
-			'' if page == 1 else index_link(page - 1, 'Previous', '', ' '),
-			page_str,
-			'' if page == last_page else index_link(page + 1, 'Next', ' ', ''),
-			'' if page >= last_page-1 else index_link(last_page, 'Last', ' ', ''),
-			'</p>'])
+def print_index_page(template, table, page, num_pages):
 	template_vars = {
-		'title': global_spec.title,
 		'date': global_spec.date,
-		'number': page_str,
-		'table_data': '\n'.join(table_data),
-		'pager': pager,
+		'title': global_spec.title,
+		'table': table,
 	}
-	with open(index_path(page), 'w') as f:
-		f.write(index_template % template_vars)
+	if num_pages > 1:
+		template_vars['number'] = f'{page}/{num_pages}'
+		if page > 1:
+			template_vars['prev_page'] = index_path(page - 1)
+			if page > 2:
+				template_vars['first_page'] = index_path(1)
+		if page < num_pages:
+			template_vars['next_page'] = index_path(page + 1)
+			if page < num_pages - 1:
+				template_vars['last_page'] = index_path(num_pages)
+
+	temple.write(template, index_path(page), template_vars)
 
 def print_thumb_pages(images):
-	with open('index_template.html') as f:
-		index_template = f.read()
-
+	template = temple.read('index_template.html')
 	thumb_cols = global_spec.thumb_cols
 	thumb_rows = global_spec.thumb_rows
 
 	thumbs_per_page = thumb_cols * thumb_rows
 	num_pages = (len(images) + thumbs_per_page - 1) // thumbs_per_page
 
-	td_template = (
-		'<td><a href="{page}">'
-		'<img src="{dir}/{name}" width="{width}" height="{height}">'
-		'</a></td>'
-	)
-
 	page_number = 0
-	col, row = 0, 0
-	table_data = []
+	table = []
+	row = []
 
 	for image_number, image in enumerate(images, start=1):
-		if col == 0:
-			table_data.append('<tr>')
 
 		width, height = Image(os.path.join(image.dir.thumbs, image.name)).size
 		if (width, height) != (image.thumb_width, image.thumb_height):
@@ -205,30 +170,19 @@ def print_thumb_pages(images):
 				image.thumb_width, image.thumb_height, width, height))
 			image.thumb_width, image.thumb_height = width, height
 
-		td_vars = {
-			'dir': image.dir.thumbs,
-			'name': image.name,
-			'width': image.thumb_width,
-			'height': image.thumb_height,
-			'page': page_path(image_number),
-		}
-		table_data.append(td_template.format_map(td_vars))
-		col += 1
-		if col == thumb_cols:
-			table_data.append('</tr>')
-			col = 0
-			row += 1
-			if row == thumb_rows:
+		row.append({'image': image, 'page': page_path(image_number)})
+		if len(row) == thumb_cols:
+			table.append(row)
+			row = []
+			if len(table) == thumb_rows:
 				page_number += 1
-				print_index_page(index_template, table_data, page_number, num_pages)
-				table_data = []
-				row = 0
-
-	if table_data:
-		if col > 0 and col < thumb_cols:
-			table_data.extend(['<td>&nbsp;</td>'] * (thumb_cols - col))
-			table_data.append('</tr>')
-		print_index_page(index_template, table_data, page_number + 1, num_pages)
+				print_index_page(template, table, page_number, num_pages)
+				table = []
+	if table:
+		if row:
+			row.extend([{}] * (thumb_cols - len(row)))
+			table.append(row)
+		print_index_page(template, table, page_number + 1, num_pages)
 
 def convert(in_path, out_path, conversions):
 	command = ['/usr/local/bin/magick', in_path, *conversions, out_path]
@@ -301,8 +255,7 @@ def add_images(d):
 	thumb_aspect_ratio = get_aspect_ratio(spec.thumb_width, spec.thumb_height)
 	check_ar(originals, 'Spec', spec.aspect_ratio, 'thumb', thumb_aspect_ratio)
 
-	time_adjust_cutoff = d.get('time_adjust_cutoff', 0)
-	if time_adjust_cutoff != 0:
+	if time_adjust_cutoff := d.get('time_adjust_cutoff', 0):
 		try:
 			time_adjust_cutoff = time.mktime(time.strptime(time_adjust_cutoff, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:

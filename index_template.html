@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>%(title)s (%(date)s) %(number)s</title>
+<title><?title> (<?date>)<?if number> <?number><?end></title>
 <style>
 body {
 	background-color: white;
@@ -23,12 +23,14 @@ a {text-decoration: none;}
 </head>
 <body>
 
-<b>%(title)s (%(date)s)</b>
+<b><?title> (<?date>)</b>
 
 <p><table>
-%(table_data)s
-</table>
-%(pager)s
+<?for row in table><tr>
+<?for c in row><td><?if c><a href="<?c.page>"><img src="<?c.image.dir.thumbs>/<?c.image.name>" width="<?c.image.thumb_width>" height="<?c.image.thumb_height>"></a><?else>&nbsp;<?end></td>
+<?end></tr>
+<?end></table>
+<?if number><p><?if prev_page><?if first_page>(<a href="<?first_page>">First</a>) <?end>(<a href="<?prev_page>"></a>) <?end><?number><?if next_page> (<a href="<?next_page>">Next</a>)<?if last_page> (<a href="<?last_page>">Last</a>)<?end><?end></p><?end>
 
 </body>
 </html>

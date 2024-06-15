@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>%(title)s (%(date)s) %(number)s</title>
+<title><?title> (<?date>) <?number></title>
 <style>
 body {
 	background-color: white;
@@ -10,12 +10,12 @@ body {
 	font-size: 10pt;
 	text-align: center;
 }
-.caption {
+<?if caption>.caption {
 	margin-left: auto;
 	margin-right: auto;
-	width: %(width)upx;
+	width: <?image.width>px;
 }
-.smaller {
+<?end>.smaller {
 	font-size: 8pt;
 }
 img {
@@ -26,10 +26,11 @@ a {text-decoration: none;}
 </head>
 <body>
 
-<b><a href="%(index_page)s">%(title)s</a> (%(date)s)</b>
-<p><a href="%(next_page)s#c"><img id="c" src="%(dir)s/%(name)s" width="%(width)u" height="%(height)u"></a></p>
-%(caption)s<p>%(left_arrow)s%(number)s%(right_arrow)s</p>
-<p class="smaller">(<a href="%(original_dir)s/%(name)s">%(name)s</a>, %(original_info)s)</p>
+<b><a href="<?index_page>"><?title></a> (<?date>)</b>
+<p><a href="<?next_page>"><img src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>"></a></p>
+<?if caption><p class="caption"><?caption></p>
+<?end><p><?if prev_link><?if first_page><a href="<?first_page>">(First)</a> <?end><a href="<?prev_page>">(Previous)</a> <?end><?number><?if next_link> <a href="<?next_page>">(Next)</a><?if last_page> <a href="<?last_page>">(Last)</a><?end><?end></p>
+<p class="smaller">(<a href="<?image.dir.originals>/<?image.name>"><?image.name></a>, <?image.info>)</p>
 
 </body>
 </html>
