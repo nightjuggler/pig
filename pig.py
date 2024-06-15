@@ -81,6 +81,22 @@ class ImageInfo(object):
 		self.width, self.height = self.height, self.width
 		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 
+	def check_size(self):
+		path = os.path.join(self.dir.images, self.name)
+		size = Image(path).size
+		if size != (self.width, self.height):
+			print('Changing size for {} from {}x{} to {}x{}'.format(path,
+				self.width, self.height, *size))
+			self.width, self.height = size
+
+	def check_thumb_size(self):
+		path = os.path.join(self.dir.thumbs, self.name)
+		size = Image(path).size
+		if size != (self.thumb_width, self.thumb_height):
+			print('Changing size for {} from {}x{} to {}x{}'.format(path,
+				self.thumb_width, self.thumb_height, *size))
+			self.thumb_width, self.thumb_height = size
+
 	@classmethod
 	def sort(cls):
 		if getattr(global_spec, 'sort_by_time', False):
@@ -96,11 +112,13 @@ def print_image_pages(images):
 
 	num_images = len(images)
 	for image_number, image in enumerate(images, start=1):
+		image.check_size()
 		template_vars = {
 			'date': global_spec.date,
 			'title': global_spec.title,
 			'image': image,
 			'number': f'{image_number}/{num_images}',
+			'half_width': image.width // 2,
 			'index_page': index_path((image_number - 1) // thumbs_per_page + 1),
 			'caption': image.spec.captions.get(image.name, ''),
 		}
@@ -123,66 +141,53 @@ def print_image_pages(images):
 			next_page = 1
 		template_vars['next_page'] = page_path(next_page)
 
-		width, height = Image(os.path.join(image.dir.images, image.name)).size
-		if (width, height) != (image.width, image.height):
-			print('Changing image size for {} from {}x{} to {}x{}'.format(image.name,
-				image.width, image.height, width, height))
-			image.width, image.height = width, height
-
 		temple.write(template, page_path(image_number), template_vars)
 
-def print_index_page(template, table, page, num_pages):
-	template_vars = {
-		'date': global_spec.date,
-		'title': global_spec.title,
-		'table': table,
-	}
-	if num_pages > 1:
-		template_vars['number'] = f'{page}/{num_pages}'
-		if page > 1:
-			template_vars['prev_page'] = index_path(page - 1)
-			if page > 2:
-				template_vars['first_page'] = index_path(1)
-		if page < num_pages:
-			template_vars['next_page'] = index_path(page + 1)
-			if page < num_pages - 1:
-				template_vars['last_page'] = index_path(num_pages)
-
-	temple.write(template, index_path(page), template_vars)
-
-def print_thumb_pages(images):
-	template = temple.read('index_template.html')
+def prep_thumb_pages(images):
 	thumb_cols = global_spec.thumb_cols
 	thumb_rows = global_spec.thumb_rows
-
-	thumbs_per_page = thumb_cols * thumb_rows
-	num_pages = (len(images) + thumbs_per_page - 1) // thumbs_per_page
-
-	page_number = 0
-	table = []
-	row = []
+	row, table, pages = [], [], []
 
 	for image_number, image in enumerate(images, start=1):
-
-		width, height = Image(os.path.join(image.dir.thumbs, image.name)).size
-		if (width, height) != (image.thumb_width, image.thumb_height):
-			print('Changing thumb size for {} from {}x{} to {}x{}'.format(image.name,
-				image.thumb_width, image.thumb_height, width, height))
-			image.thumb_width, image.thumb_height = width, height
-
+		image.check_thumb_size()
 		row.append({'image': image, 'page': page_path(image_number)})
 		if len(row) == thumb_cols:
 			table.append(row)
 			row = []
 			if len(table) == thumb_rows:
-				page_number += 1
-				print_index_page(template, table, page_number, num_pages)
+				pages.append(table)
 				table = []
 	if table:
 		if row:
 			row.extend([{}] * (thumb_cols - len(row)))
 			table.append(row)
-		print_index_page(template, table, page_number + 1, num_pages)
+		pages.append(table)
+
+	return pages
+
+def print_thumb_pages(images):
+	pages = prep_thumb_pages(images)
+	num_pages = len(pages)
+	template = temple.read('index_template.html')
+
+	for page, table in enumerate(pages, start=1):
+		template_vars = {
+			'date': global_spec.date,
+			'title': global_spec.title,
+			'table': table,
+		}
+		if num_pages > 1:
+			template_vars['number'] = f'{page}/{num_pages}'
+			if page > 1:
+				template_vars['prev_page'] = index_path(page - 1)
+				if page > 2:
+					template_vars['first_page'] = index_path(1)
+			if page < num_pages:
+				template_vars['next_page'] = index_path(page + 1)
+				if page < num_pages - 1:
+					template_vars['last_page'] = index_path(num_pages)
+
+		temple.write(template, index_path(page), template_vars)
 
 def convert(in_path, out_path, conversions):
 	command = ['/usr/local/bin/magick', in_path, *conversions, out_path]

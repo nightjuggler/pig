@@ -25,9 +25,13 @@ a {text-decoration: none;}
 </style>
 </head>
 <body>
+<map name="imgmap">
+<area shape="rect" coords="0,0,<?half_width>,<?image.height>" href="<?prev_page>" />
+<area shape="default" href="<?next_page>" />
+</map>
 
 <b><a href="<?index_page>"><?title></a> (<?date>)</b>
-<p><a href="<?next_page>"><img src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>"></a></p>
+<p><a href="<?next_page>"><img src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /></a></p>
 <?if caption><p class="caption"><?caption></p>
 <?end><p><?if prev_link><?if first_page><a href="<?first_page>">(First)</a> <?end><a href="<?prev_page>">(Previous)</a> <?end><?number><?if next_link> <a href="<?next_page>">(Next)</a><?if last_page> <a href="<?last_page>">(Last)</a><?end><?end></p>
 <p class="smaller">(<?image.name>, <?image.info>)</p>
