@@ -6,6 +6,17 @@ def formatTime(timestamp):
 	ymdhms = time.localtime(timestamp)[0:6]
 	return "{}-{:02}-{:02} {:02}:{:02}:{:02}".format(*ymdhms)
 
+def setTime(fileName, oldTime, newTime, timeDesc, verbose):
+	if abs(oldTime - newTime) <= 1:
+		if verbose > 2:
+			print(fileName, 'already has its mod time equal to its', timeDesc)
+		return False
+
+	os.utime(fileName, (newTime, newTime))
+	if verbose > 0:
+		print(fileName, 'mod time changed from', formatTime(oldTime), 'to', formatTime(newTime))
+	return True
+
 def setFromExifTime(fileName, verbose=0):
 	try:
 		image = Image(fileName)
@@ -13,23 +24,12 @@ def setFromExifTime(fileName, verbose=0):
 		print(fileName, e.__class__.__name__, str(e))
 		return False
 	exifTime = image.getTimeCreated()
-	if exifTime == 0:
+	if not exifTime:
 		if verbose > 1:
 			print(fileName, "doesn't have Exif DateTimeOriginal")
 		return False
 
-	modTime = os.stat(fileName).st_mtime
-
-	if modTime in (exifTime, exifTime + 1):
-		if verbose > 2:
-			print(fileName, "already has its mod time equal to its Exif time")
-		return False
-
-	if verbose > 0:
-		print(fileName, "mod time set to {} (was {})".format(formatTime(exifTime), formatTime(modTime)))
-
-	os.utime(fileName, (exifTime, exifTime))
-	return True
+	return setTime(fileName, os.stat(fileName).st_mtime, exifTime, 'Exif time', verbose)
 
 def setFromBirthTime(fileName, verbose=0):
 	try:
@@ -38,23 +38,11 @@ def setFromBirthTime(fileName, verbose=0):
 		print(fileName, e.__class__.__name__, str(e))
 		return False
 
-	oldTime = fileInfo.st_mtime
-	newTime = fileInfo.st_birthtime
+	return setTime(fileName, fileInfo.st_mtime, fileInfo.st_birthtime, 'birth time', verbose)
 
-	if oldTime in (newTime, newTime + 1):
-		if verbose > 2:
-			print(fileName, "already has its mod time equal to its birth time")
-		return False
-
-	if verbose > 0:
-		print(fileName, "mod time set to {} (was {})".format(formatTime(newTime), formatTime(oldTime)))
-
-	os.utime(fileName, (newTime, newTime))
-	return True
-
-def parseArgs():
+def main():
 	import argparse
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(allow_abbrev=False)
 	parser.add_argument('imagePath', nargs='+')
 	parser.add_argument('--verbose', '-v', action='count', default=0)
 	parser.add_argument('--birthtime', '-b', action='store_true')
@@ -67,4 +55,4 @@ def parseArgs():
 		setTime(fileName, args.verbose)
 
 if __name__ == '__main__':
-	parseArgs()
+	main()
