@@ -7,30 +7,59 @@
 body {
 	background-color: white;
 	font-family: verdana;
-	font-size: 10pt;
+	font-size: 14pt;
 	text-align: center;
+}
+.button {
+	background-color: rgb(240,240,240);
+	border: 1px solid black;
+	display: inline-block;
+	margin: 2px;
+	padding: 4px;
+	width: 130px;
+}
+.button:hover {
+	background-color: rgb(200,200,200);
+	cursor: pointer;
 }
 img {
 	border: 2px solid black;
+	margin: 2px;
 	vertical-align: middle;
 }
-table {
-	margin-left: auto;
-	margin-right: auto;
+.title {
+	font-weight: bold;
+	margin-bottom: 4px;
 }
+.photos {
+	margin-left: auto;
+	margin-right: auto;<?if fit>
+	width: max-content;<?end>
+}<?if number>
+.pager {
+	margin-top: 4px;
+}<?end>
 a {text-decoration: none;}
 </style>
 </head>
 <body>
-
-<b><?title> (<?date>)</b>
-
-<p><table>
+<div class="title"><?title> (<?date>)</div>
+<?if fit>
+<?for row in table><div class="photos"><?for image in row><?if image><a href="<?image.page>"><img src="<?image.dir.thumbs>/<?image.name>" width="<?image.thumb_width>" height="<?image.thumb_height>" /></a><?end><?end></div>
+<?end><?else>
+<table class="photos">
 <?for row in table><tr>
-<?for c in row><td><?if c><a href="<?c.page>"><img src="<?c.image.dir.thumbs>/<?c.image.name>" width="<?c.image.thumb_width>" height="<?c.image.thumb_height>"></a><?else>&nbsp;<?end></td>
+<?for image in row><td><?if image><a href="<?image.page>"><img src="<?image.dir.thumbs>/<?image.name>" width="<?image.thumb_width>" height="<?image.thumb_height>" /></a><?else>&nbsp;<?end></td>
 <?end></tr>
 <?end></table>
-<?if number><p><?if prev_page><?if first_page>(<a href="<?first_page>">First</a>) <?end>(<a href="<?prev_page>"></a>) <?end><?number><?if next_page> (<a href="<?next_page>">Next</a>)<?if last_page> (<a href="<?last_page>">Last</a>)<?end><?end></p><?end>
-
+<?end><?if number>
+<div class="pager">
+<?if prev_page><?if first_page><a href="<?first_page>"><div class="button">First</div></a>
+<?end><a href="<?prev_page>"><div class="button">Previous</div></a>
+<?end><?number><?if next_page>
+<a href="<?next_page>"><div class="button">Next</div></a><?if last_page>
+<a href="<?last_page>"><div class="button">Last</div></a><?end><?end>
+</div>
+<?end>
 </body>
 </html>

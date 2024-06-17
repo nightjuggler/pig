@@ -81,22 +81,6 @@ class ImageInfo(object):
 		self.width, self.height = self.height, self.width
 		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 
-	def check_size(self):
-		path = os.path.join(self.dir.images, self.name)
-		size = Image(path).size
-		if size != (self.width, self.height):
-			print('Changing size for {} from {}x{} to {}x{}'.format(path,
-				self.width, self.height, *size))
-			self.width, self.height = size
-
-	def check_thumb_size(self):
-		path = os.path.join(self.dir.thumbs, self.name)
-		size = Image(path).size
-		if size != (self.thumb_width, self.thumb_height):
-			print('Changing size for {} from {}x{} to {}x{}'.format(path,
-				self.thumb_width, self.thumb_height, *size))
-			self.thumb_width, self.thumb_height = size
-
 	@classmethod
 	def sort(cls):
 		if getattr(global_spec, 'sort_by_time', False):
@@ -106,23 +90,21 @@ class ImageInfo(object):
 		cls.images.sort(key=operator.attrgetter(sort_attr))
 		return cls.images
 
-def print_image_pages(images):
+def create_image_pages(images, options):
+	write = options.image_pages
 	template = temple.read('page_template.html')
-	thumbs_per_page = global_spec.thumb_cols * global_spec.thumb_rows
-
 	num_images = len(images)
+
 	for image_number, image in enumerate(images, start=1):
-		image.check_size()
+		image.page = page_path(image_number)
 		template_vars = {
 			'date': global_spec.date,
 			'title': global_spec.title,
 			'image': image,
 			'number': f'{image_number}/{num_images}',
 			'half_width': image.width // 2,
-			'index_page': index_path((image_number - 1) // thumbs_per_page + 1),
 			'caption': image.spec.captions.get(image.name, ''),
 		}
-
 		if image_number > 1:
 			prev_page = image_number - 1
 			template_vars['prev_link'] = True
@@ -140,41 +122,98 @@ def print_image_pages(images):
 		else:
 			next_page = 1
 		template_vars['next_page'] = page_path(next_page)
+		if write:
+			temple.write(template, image.page, template_vars)
 
-		temple.write(template, page_path(image_number), template_vars)
+def fit_sizes1(max_width, sizes):
+	((w, h), images), = sizes
+	new_w = round(max_width / len(images))
+	new_h = round(new_w * h/w)
+	for image in images:
+		image.thumb_width, image.thumb_height = new_w, new_h
 
-def prep_thumb_pages(images):
+def fit_sizes2(max_width, sizes):
+	((w1, h1), images1), ((w2, h2), images2) = sizes
+	n1 = len(images1)
+	n2 = len(images2)
+
+	# (1) n1*(w1+d1) + n2*(w2+d2) = max_width
+	# (2) (w1+d1)*h1/w1 = (w2+d2)*h2/w2
+
+	# w2+d2 = (max_width - n1*(w1+d1)) / n2
+	# w1+d1 = max_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
+
+	new_w1 = max_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
+	new_w2 = (max_width - n1*new_w1) / n2
+
+	new_w1 = round(new_w1)
+	new_h1 = round(new_w1 * h1/w1)
+	new_w2 = round(new_w2)
+	new_h2 = round(new_w2 * h2/w2)
+
+	for image in images1:
+		image.thumb_width, image.thumb_height = new_w1, new_h1
+	for image in images2:
+		image.thumb_width, image.thumb_height = new_w2, new_h2
+
+def calculate_fitted_sizes(pages):
+	for page_num, table in enumerate(pages, start=1):
+		max_width = max(sum(image.thumb_width for image in row if image) for row in table)
+		for row_num, row in enumerate(table, start=1):
+			sizes = {}
+			for image in row:
+				size = image.thumb_width, image.thumb_height
+				sizes.setdefault(size, []).append(image)
+			sizes = sorted(sizes.items())
+			if len(sizes) == 2:
+				fit_sizes2(max_width, sizes)
+			elif len(sizes) == 1:
+				fit_sizes1(max_width, sizes)
+			else:
+				sizes = [f'{w}x{h} [{len(images)}]' for (w, h), images in sizes]
+				sizes = ', '.join(sizes[:-1]) + ', and ' + sizes[-1]
+				print('Cannot calculate fitted sizes for thumbs on '
+					f'page {page_num}, row {row_num}!\n'
+					f'More than two different sizes: {sizes}')
+
+def prep_thumb_pages(images, fit):
 	thumb_cols = global_spec.thumb_cols
 	thumb_rows = global_spec.thumb_rows
 	row, table, pages = [], [], []
+	index_page = index_path(1)
 
-	for image_number, image in enumerate(images, start=1):
-		image.check_thumb_size()
-		row.append({'image': image, 'page': page_path(image_number)})
+	for image in images:
+		image.index_page = index_page
+		row.append(image)
 		if len(row) == thumb_cols:
 			table.append(row)
 			row = []
 			if len(table) == thumb_rows:
 				pages.append(table)
 				table = []
+				index_page = index_path(len(pages) + 1)
+	if row:
+		if not fit:
+			row.extend([None] * (thumb_cols - len(row)))
+		table.append(row)
 	if table:
-		if row:
-			row.extend([{}] * (thumb_cols - len(row)))
-			table.append(row)
 		pages.append(table)
-
+	if fit:
+		calculate_fitted_sizes(pages)
 	return pages
 
-def print_thumb_pages(images):
-	pages = prep_thumb_pages(images)
-	num_pages = len(pages)
+def create_thumb_pages(pages, options):
+	fit = options.fit
+	write = options.thumb_pages
 	template = temple.read('index_template.html')
+	num_pages = len(pages)
 
 	for page, table in enumerate(pages, start=1):
 		template_vars = {
 			'date': global_spec.date,
 			'title': global_spec.title,
 			'table': table,
+			'fit': fit,
 		}
 		if num_pages > 1:
 			template_vars['number'] = f'{page}/{num_pages}'
@@ -186,53 +225,76 @@ def print_thumb_pages(images):
 				template_vars['next_page'] = index_path(page + 1)
 				if page < num_pages - 1:
 					template_vars['last_page'] = index_path(num_pages)
+		if write:
+			temple.write(template, index_path(page), template_vars)
 
-		temple.write(template, index_path(page), template_vars)
+def mkdir(name):
+	if not os.path.exists(name):
+		os.mkdir(name)
 
 def convert(in_path, out_path, conversions):
 	command = ['/usr/local/bin/magick', in_path, *conversions, out_path]
 	print(*command)
 	subprocess.run(command)
 
-def convert_all(images, options):
-	for image in images:
-		original_path = os.path.join(image.dir.originals, image.name)
-		image_path = os.path.join(image.dir.images, image.name)
-		thumb_path = os.path.join(image.dir.thumbs, image.name)
+def create_album(images, options):
+	thumb_pages = prep_thumb_pages(images, options.fit)
 
-		pre_convert = image.spec.pre_convert.get(image.name)
-		post_convert = image.spec.post_convert.get(image.name)
+	create_images = options.convert and options.convert_images
+	create_thumbs = options.convert and options.convert_thumbs
+	normalize_all = options.normalize_all
+
+	for spec in {image.dir for image in images}:
+		if create_images: mkdir(spec.images)
+		if create_thumbs: mkdir(spec.thumbs)
+
+	for image in images:
+		name = image.name
+		spec = image.spec
+
+		original_path = os.path.join(image.dir.originals, name)
+		image_path = os.path.join(image.dir.images, name)
+		thumb_path = os.path.join(image.dir.thumbs, name)
 
 		conversions = ['-strip']
-		if pre_convert:
+		if pre_convert := spec.pre_convert.get(name):
 			conversions.append(pre_convert)
 		conversions.append('-resize')
 		conversions.append(str(image.resize_width))
 		if image.rotate:
 			conversions.append('-rotate')
 			conversions.append(image.rotate)
-
-		if post_convert:
+		if post_convert := spec.post_convert.get(name):
 			conversions.append(post_convert)
-		if options.normalize_all or image.name in image.spec.normalize:
+		if normalize_all or name in spec.normalize:
 			conversions.append('-normalize')
 
-		if options.convert_images and not os.path.exists(image_path):
+		if not os.path.exists(image_path) and create_images:
 			convert(original_path, image_path, conversions)
-		if options.convert_thumbs and not os.path.exists(thumb_path):
-			convert(image_path, thumb_path, ['-strip', '-resize', str(image.thumb_width)])
+		if os.path.exists(image_path):
+			size = Image(image_path).size
+			if size != (image.width, image.height):
+				print('Changing size for {} from {}x{} to {}x{}'.format(image_path,
+					image.width, image.height, *size))
+				image.width, image.height = size
 
-def mkdir(name):
-	if not os.path.exists(name):
-		os.mkdir(name)
+		if not os.path.exists(thumb_path) and create_thumbs:
+			convert(image_path, thumb_path, ['-strip', '-resize', str(image.thumb_width)])
+		if os.path.exists(thumb_path):
+			size = Image(thumb_path).size
+			if size != (image.thumb_width, image.thumb_height):
+				print('Changing size for {} from {}x{} to {}x{}'.format(thumb_path,
+					image.thumb_width, image.thumb_height, *size))
+				image.thumb_width, image.thumb_height = size
+
+	create_image_pages(images, options)
+	create_thumb_pages(thumb_pages, options)
 
 class DirSpec(object):
 	def __init__(self, suffix):
 		self.originals = 'originals' + suffix
 		self.images = 'images' + suffix
 		self.thumbs = 'thumbs' + suffix
-		mkdir(self.images)
-		mkdir(self.thumbs)
 
 class SharedSpec(object):
 	def __init__(self, d):
@@ -316,28 +378,7 @@ def add_images(d):
 			crop_count_map[name] = crop_count + 1
 			convert_orig(name, f'{name[:-4]}_{crop_count}{name[-4:]}', ['-crop', geometry])
 
-def run(options):
-	add_images(vars(global_spec))
-	for spec in getattr(global_spec, 'more_photos', ()):
-		add_images(spec)
-
-	images = ImageInfo.sort()
-	if options.convert:
-		convert_all(images, options)
-	if options.image_pages:
-		print_image_pages(images)
-	if options.thumb_pages:
-		print_thumb_pages(images)
-
-	if options.best and os.path.exists('best'):
-		images = [image for image in images if image.name in image.spec.best]
-
-		os.chdir('best')
-		print_image_pages(images)
-		print_thumb_pages(images)
-		os.chdir('..')
-
-def main():
+def get_options():
 	parser = argparse.ArgumentParser(allow_abbrev=False)
 	parser.add_argument('--no-convert', dest='convert', action='store_false')
 	parser.add_argument('--no-convert-images', dest='convert_images', action='store_false')
@@ -346,7 +387,24 @@ def main():
 	parser.add_argument('--no-image-pages', dest='image_pages', action='store_false')
 	parser.add_argument('--no-thumb-pages', dest='thumb_pages', action='store_false')
 	parser.add_argument('--no-best', dest='best', action='store_false')
-	run(parser.parse_args())
+	parser.add_argument('--fit', action='store_true')
+	return parser.parse_args()
+
+def main():
+	options = get_options()
+
+	add_images(vars(global_spec))
+	for spec in getattr(global_spec, 'more_photos', ()):
+		add_images(spec)
+
+	images = ImageInfo.sort()
+	create_album(images, options)
+
+	if options.best and os.path.exists('best'):
+		images = [image for image in images if image.name in image.spec.best]
+		os.chdir('best')
+		create_album(images, options)
+		os.chdir('..')
 
 if __name__ == '__main__':
 	main()

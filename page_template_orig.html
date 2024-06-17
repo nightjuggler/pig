@@ -7,19 +7,33 @@
 body {
 	background-color: white;
 	font-family: verdana;
-	font-size: 10pt;
+	font-size: 14pt;
 	text-align: center;
 }
+.button {
+	background-color: rgb(240,240,240);
+	border: 1px solid black;
+	display: inline-block;
+	margin: 2px;
+	padding: 4px;
+	width: 130px;
+}
+.button:hover {
+	background-color: rgb(200,200,200);
+	cursor: pointer;
+}
 <?if caption>.caption {
-	margin-left: auto;
-	margin-right: auto;
+	margin: 0 auto 8px auto; /* top, right, bottom, left */
 	width: <?image.width>px;
 }
-<?end>.smaller {
-	font-size: 8pt;
+<?end>.info {
+	font-size: 10pt;
+	margin: 8px auto 8px auto; /* top, right, bottom, left */
+	width: max-content;
 }
-img {
+#photo {
 	border: 4px solid black;
+	margin: 6px auto 4px auto; /* top, right, bottom, left */
 }
 a {text-decoration: none;}
 </style>
@@ -30,11 +44,15 @@ a {text-decoration: none;}
 <area shape="default" href="<?next_page>" />
 </map>
 
-<b><a href="<?index_page>"><?title></a> (<?date>)</b>
-<p><a href="<?next_page>"><img src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /></a></p>
-<?if caption><p class="caption"><?caption></p>
-<?end><p><?if prev_link><?if first_page><a href="<?first_page>">(First)</a> <?end><a href="<?prev_page>">(Previous)</a> <?end><?number><?if next_link> <a href="<?next_page>">(Next)</a><?if last_page> <a href="<?last_page>">(Last)</a><?end><?end></p>
-<p class="smaller">(<a href="<?image.dir.originals>/<?image.name>"><?image.name></a>, <?image.info>)</p>
+<b><a href="<?image.index_page>"><?title></a> (<?date>)</b><br>
+<img id="photo" src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /><br>
+<?if caption><div class="caption"><?caption></div>
+<?end><?if prev_link><?if first_page><a href="<?first_page>"><div class="button">First</div></a>
+<?end><a href="<?prev_page>"><div class="button">Previous</div></a>
+<?end><?number><?if next_link>
+<a href="<?next_page>"><div class="button">Next</div></a><?if last_page>
+<a href="<?last_page>"><div class="button">Last</div></a><?end><?end><br>
+<div class="info">(<a href="<?image.dir.originals>/<?image.name>"><?image.name></a>, <?image.info>)</div>
 
 </body>
 </html>
