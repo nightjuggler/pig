@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title><?title> (<?date>) <?number></title>
+<title><?title> (<?date>) <?image.number>/<?num_images></title>
 <style>
 body {
 	background-color: white;
@@ -44,12 +44,12 @@ a {text-decoration: none;}
 <area shape="default" href="<?next_page>" />
 </map>
 
-<b><a href="<?image.index_page>"><?title></a> (<?date>)</b><br>
+<b><a href="<?image.index_page>#p<?image.number>"><?title></a> (<?date>)</b><br>
 <img id="photo" src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /><br>
 <?if caption><div class="caption"><?caption></div>
 <?end><?if prev_link><?if first_page><a href="<?first_page>"><div class="button">First</div></a>
 <?end><a href="<?prev_page>"><div class="button">Previous</div></a>
-<?end><?number><?if next_link>
+<?end><?image.number>/<?num_images><?if next_link>
 <a href="<?next_page>"><div class="button">Next</div></a><?if last_page>
 <a href="<?last_page>"><div class="button">Last</div></a><?end><?end><br>
 <div class="info"><a href="<?image.dir.originals>/<?image.name>"><div class="button">&nbsp;<?image.size_px>, <?image.size_mb>&nbsp;</div></a><?if image.time>

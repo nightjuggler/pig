@@ -97,12 +97,13 @@ def create_image_pages(images, options):
 	num_images = len(images)
 
 	for image_number, image in enumerate(images, start=1):
+		image.number = image_number
 		image.page = page_path(image_number)
 		template_vars = {
 			'date': global_spec.date,
 			'title': global_spec.title,
 			'image': image,
-			'number': f'{image_number}/{num_images}',
+			'num_images': num_images,
 			'half_width': image.width // 2,
 			'caption': image.spec.captions.get(image.name, ''),
 		}
