@@ -30,7 +30,7 @@ def format_time(timestamp):
 		if hour > 12:
 			hour -= 12
 
-	return f', {month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
+	return f'{month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
 
 def get_greatest_common_divisor(a, b):
 	while b:
@@ -56,11 +56,12 @@ class ImageInfo(object):
 		image = Image(path)
 		width, height = image.size
 
-		self.info = f'{width}x{height}, {stat.st_size/1024/1024:.1f}MB'
+		self.size_px = f'{width}x{height}'
+		self.size_mb = f'{stat.st_size/1024/1024:.1f}MB'
 
 		if timestamp := image.getTimeCreated() or stat.st_mtime:
 			if timestamp > spec.time_adjust_cutoff: timestamp += spec.time_adjust
-			self.info += format_time(timestamp)
+			self.time = format_time(timestamp)
 
 		self.time_and_name = timestamp, name
 

@@ -16,7 +16,8 @@ body {
 	display: inline-block;
 	margin: 2px;
 	padding: 4px;
-	width: 130px;
+	min-width: 130px;
+	width: max-content;
 }
 .button:hover {
 	background-color: rgb(200,200,200);
@@ -27,7 +28,6 @@ body {
 	width: <?image.width>px;
 }
 <?end>.info {
-	font-size: 10pt;
 	margin: 8px auto 8px auto; /* top, right, bottom, left */
 	width: max-content;
 }
@@ -52,7 +52,8 @@ a {text-decoration: none;}
 <?end><?number><?if next_link>
 <a href="<?next_page>"><div class="button">Next</div></a><?if last_page>
 <a href="<?last_page>"><div class="button">Last</div></a><?end><?end><br>
-<div class="info">(<?image.name>, <?image.info>)</div>
+<div class="info"><a href="<?image.dir.originals>/<?image.name>"><div class="button">&nbsp;<?image.size_px>, <?image.size_mb>&nbsp;</div></a><?if image.time>
+<?image.time><?end></div>
 
 </body>
 </html>
