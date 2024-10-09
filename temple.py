@@ -1,5 +1,7 @@
 import re
-import sys
+
+class TemplateError(Exception):
+	pass
 
 class Variable(object):
 	def __init__(self, name):
@@ -68,14 +70,11 @@ class Template(object):
 			return template
 		return self
 
-def read(path):
+def parse(data):
 	pattern_var = '[a-z][0-9_a-z]*(?:\.[0-9_a-z]+)*'
 	pattern_cond = re.compile('if ' + pattern_var)
 	pattern_loop = re.compile('for [a-z][0-9_a-z]* in ' + pattern_var)
 	pattern_var = re.compile(pattern_var)
-
-	with open(path) as f:
-		data = f.read()
 
 	template = Template()
 	i = 0
@@ -83,7 +82,7 @@ def read(path):
 	def err(message):
 		line = data.count('\n', 0, i) + 1
 		column = i - data.rfind('\n', 0, i)
-		sys.exit(f'{path}: {message} at line {line}, column {column}!')
+		raise TemplateError(f'{message} at line {line}, column {column}')
 
 	while True:
 		if (j := data.find('<?', i)) < 0: break
@@ -117,6 +116,3 @@ def read(path):
 		err('Missing <?end>')
 	return template.add(data[i:])
 
-def write(template, path, varmap):
-	with open(path, 'w') as f:
-		template.write(f, varmap)

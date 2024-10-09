@@ -5,19 +5,46 @@ independently of each other: **pig.py** (PIG) and **pie.html** (PIE).
 The first version of **pig.py** was written in May 2008, partly
 inspired by Max P's **lightbox**.
 
-## PIG (Pius' Image Gallery)
+## PIG (P's Image Gallery)
 
 **pig.py** is a Python script that will (1) create resized (and
 cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs)
 according to **spec.py** and (2) create HTML pages for a gallery /
 photo album containing those images. **index_template.html** and
 **page_template.html** are used as templates for the HTML pages.
-[ImageMagick](https://www.imagemagick.org/)'s
-[convert](https://www.imagemagick.org/script/convert.php) utility is
+[ImageMagick](https://www.imagemagick.org/) is
 used to create the copies of the original images. Thus both Python and
 ImageMagick must be installed to run **pig.py**.
 
-## PIE (Pius' Image Editor)
+### temple.py
+
+**temple.py** defines a **parse** function that parses a string and returns an instance
+of the **Template** class. The input string can contain processing directives for simple
+conditionals (&lt;?if **variable**&gt; ... &lt;?else&gt; ... &lt;?end&gt;), loops
+(&lt;?for **loop-variable** in **sequence-variable**&gt; ... &lt;?end&gt;), and variable
+substitutions (&lt;?**variable**&gt;). Instances of **Template** can then be evaluated
+and written to any object that has a **write** method, like a file object. This allows
+for all of the HTML for the image gallery to be contained in the HTML template files.
+
+```
+>>> import io
+>>> import temple
+>>> template = temple.parse('''&lt;ul&gt;
+... &lt;?for person in people&gt;&lt;li&gt;&lt;?person.name&gt;'s age is &lt;?if person.age&gt;&lt;?person.age&gt;&lt;?else&gt;unknown&lt;?end&gt;.
+... &lt;?end&gt;&lt;/ul&gt;''')
+>>> people = [{'name': 'Alice', 'age': 28}, {'name': 'Bob'}]
+>>> with io.StringIO() as output:
+...   template.write(output, locals())
+...   print(output.getvalue())
+... 
+&lt;ul&gt;
+&lt;li&gt;Alice's age is 28.
+&lt;li&gt;Bob's age is unknown.
+&lt;/ul&gt;
+>>> 
+```
+
+## PIE (P's Image Editor)
 
 **pie.html**, on the other hand, is a browser-based tool, written in
 JavaScript (with CSS and HTML), originally intended only for rotating

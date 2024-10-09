@@ -91,9 +91,17 @@ class ImageInfo(object):
 		cls.images.sort(key=operator.attrgetter(sort_attr))
 		return cls.images
 
+def read_template(path):
+	with open(path) as file:
+		try:
+			template = temple.parse(file.read())
+		except temple.TemplateError as error:
+			template = None
+			print(path, error, sep=': ')
+	return template
+
 def create_image_pages(images, options):
-	write = options.image_pages
-	template = temple.read('page_template.html')
+	template = options.image_pages and read_template('page_template.html')
 	num_images = len(images)
 
 	for image_number, image in enumerate(images, start=1):
@@ -124,8 +132,9 @@ def create_image_pages(images, options):
 		else:
 			next_page = 1
 		template_vars['next_page'] = page_path(next_page)
-		if write:
-			temple.write(template, image.page, template_vars)
+		if template:
+			with open(image.page, 'w') as file:
+				template.write(file, template_vars)
 
 def fit_sizes1(max_width, sizes):
 	((w, h), images), = sizes
@@ -206,8 +215,7 @@ def prep_thumb_pages(images, fit):
 
 def create_thumb_pages(pages, options):
 	fit = options.fit
-	write = options.thumb_pages
-	template = temple.read('index_template.html')
+	template = options.thumb_pages and read_template('index_template.html')
 	num_pages = len(pages)
 
 	for page, table in enumerate(pages, start=1):
@@ -227,8 +235,9 @@ def create_thumb_pages(pages, options):
 				template_vars['next_page'] = index_path(page + 1)
 				if page < num_pages - 1:
 					template_vars['last_page'] = index_path(num_pages)
-		if write:
-			temple.write(template, index_path(page), template_vars)
+		if template:
+			with open(index_path(page), 'w') as file:
+				template.write(file, template_vars)
 
 def mkdir(name):
 	if not os.path.exists(name):
