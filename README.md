@@ -29,19 +29,19 @@ for all of the HTML for the image gallery to be contained in the HTML template f
 ```
 >>> import io
 >>> import temple
->>> template = temple.parse('''&lt;ul&gt;
-... &lt;?for person in people&gt;&lt;li&gt;&lt;?person.name&gt;'s age is &lt;?if person.age&gt;&lt;?person.age&gt;&lt;?else&gt;unknown&lt;?end&gt;.
-... &lt;?end&gt;&lt;/ul&gt;''')
+>>> template = temple.parse('''<ul>
+... <?for person in people><li><?person.name>'s age is <?if person.age><?person.age><?else>unknown<?end>.
+... <?end></ul>''')
 >>> people = [{'name': 'Alice', 'age': 28}, {'name': 'Bob'}]
 >>> with io.StringIO() as output:
 ...   template.write(output, locals())
 ...   print(output.getvalue())
-... 
-&lt;ul&gt;
-&lt;li&gt;Alice's age is 28.
-&lt;li&gt;Bob's age is unknown.
-&lt;/ul&gt;
->>> 
+...
+<ul>
+<li>Alice's age is 28.
+<li>Bob's age is unknown.
+</ul>
+>>>
 ```
 
 ## PIE (P's Image Editor)
