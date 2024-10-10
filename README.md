@@ -52,7 +52,7 @@ and precisely cropping images while maintaining their original aspect
 ratio in order to determine the crop geometry
 (**width**x**height**+**x**+**y**) for an image. The crop geometry can
 be copied and pasted into the **crop** list defined in **spec.py** so
-that it will be passed to **convert** by **pig.py**.
+that it will be passed to **magick** by **pig.py**.
 
 However, **pie.html** (see
 [https://nightjuggler.com/pie/](https://nightjuggler.com/pie/)) has
