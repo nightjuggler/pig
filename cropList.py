@@ -1,14 +1,14 @@
 import os
 
 def writeCropList(imageDir):
-	js_file = open('cropList.js', 'w')
-	js_file.write('var showCropGeometry = true;\n')
-	js_file.write('var imagePath = "{}/";\n'.format(imageDir))
-	js_file.write('var imageNames = [\n')
-	js_file.write(',\n'.join(['\t"{}"'.format(name) for name in os.listdir(imageDir)
-		if name[-4:] in ('.JPG', '.jpg', '.PNG', '.png')]))
-	js_file.write('\n];\n')
-	js_file.close()
+	imageNames = sorted(name for name in os.listdir(imageDir)
+		if name.endswith(('.JPG', '.jpg', '.PNG', '.png')))
+	with open('cropList.js', 'w') as f:
+		f.write('var showCropGeometry = true;\n')
+		f.write(f'var imagePath = "{imageDir}/";\n')
+		f.write('var imageNames = [\n')
+		f.write(',\n'.join([f'\t"{name}"' for name in imageNames]))
+		f.write('\n];\n')
 
 if __name__ == '__main__':
 	import argparse
