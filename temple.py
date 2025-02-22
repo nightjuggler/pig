@@ -71,7 +71,7 @@ class Template(object):
 		return self
 
 def parse(data):
-	pattern_var = '[a-z][0-9_a-z]*(?:\.[0-9_a-z]+)*'
+	pattern_var = '[a-z][0-9_a-z]*(?:\\.[0-9_a-z]+)*'
 	pattern_cond = re.compile('if ' + pattern_var)
 	pattern_loop = re.compile('for [a-z][0-9_a-z]* in ' + pattern_var)
 	pattern_var = re.compile(pattern_var)
