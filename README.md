@@ -12,7 +12,7 @@ cropped, rotated, normalized, etc.) copies of images (JPEGs and PNGs)
 according to **spec.py** and (2) create HTML pages for a gallery /
 photo album containing those images. **index_template.html** and
 **page_template.html** are used as templates for the HTML pages.
-[ImageMagick](https://www.imagemagick.org/) is
+[ImageMagick](https://imagemagick.org/) is
 used to create the copies of the original images. Thus both Python and
 ImageMagick must be installed to run **pig.py**.
 

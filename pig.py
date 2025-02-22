@@ -362,7 +362,8 @@ def add_images(d):
 		elif name.endswith(('.JPG', '.jpg', '.PNG', '.png')):
 			add_image(name, name)
 
-	def convert_orig(name, new_name, conversions):
+	def convert_orig(name, suffix, conversions):
+		new_name = os.path.splitext(name)[0] + suffix + '.JPG'
 		new_path = os.path.join(dir_spec.originals, new_name)
 		if not os.path.exists(new_path):
 			path = os.path.join(originals, name)
@@ -377,7 +378,7 @@ def add_images(d):
 		mkdir(dir_spec.originals)
 
 		for name in convert_list:
-			convert_orig(name, os.path.splitext(name)[0] + '.JPG', [])
+			convert_orig(name, '', [])
 
 	if crop_list := d.get('crop'):
 		dir_spec = DirSpec(dir_suffix + '_cropped')
@@ -387,7 +388,7 @@ def add_images(d):
 		for name, geometry in crop_list:
 			crop_count = crop_count_map.get(name, 1)
 			crop_count_map[name] = crop_count + 1
-			convert_orig(name, f'{name[:-4]}_{crop_count}{name[-4:]}', ['-crop', geometry])
+			convert_orig(name, f'_{crop_count}', ['-crop', geometry])
 
 def get_options():
 	parser = argparse.ArgumentParser(allow_abbrev=False)
