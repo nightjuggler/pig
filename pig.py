@@ -76,11 +76,46 @@ class ImageInfo(object):
 
 		check_ar(path, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
 		self.resize_width = self.width
+		self.process_exif(image.exifData)
+		if spec.custom_image_info:
+			spec.custom_image_info(self, image)
 		self.images.append(self)
 
 	def rotate90(self):
 		self.width, self.height = self.height, self.width
 		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
+
+	def process_exif(self, d):
+		self.camera = ''
+		self.camera_info = ''
+		if not d: return
+
+		def get_str(key):
+			v = d.get(key)
+			return v.valueType.toStr(v.value) if v else None
+
+		make = get_str(271)
+		model = get_str(272)
+		if not (make and model): return
+		self.camera = f'{make} {model}'
+		info = [self.camera]
+		if d := d.get(34665):
+			d = d.value
+			if v := d.get(34855): # PhotographicSensitivity (short)
+				a, = v.value
+				info.append(f'ISO{a}')
+			if v := d.get(41989): # FocalLengthIn35mmFilm (short)
+				a, = v.value
+				info.append(f'{a}mm')
+			if v := d.get(33437): # FNumber (rational)
+				(a, b), = v.value
+				info.append(f'&fnof;{a/b:.2f}'.rstrip('.0'))
+			if v := d.get(42082): # SourceExposureTimesOfCompositeImage
+				info.append(v.toStr(v.value, p=1).split(', ')[1] + 's')
+			elif v := d.get(33434): # ExposureTime (rational)
+				(a, b), = v.value
+				info.append(f'{a}/{b}s')
+		self.camera_info = ', '.join(info)
 
 	@classmethod
 	def sort(cls):
@@ -315,6 +350,7 @@ class SharedSpec(object):
 		self.captions = d.get('captions', {})
 		self.normalize = frozenset(d.get('normalize', ()))
 		self.best = frozenset(d.get('best', ()))
+		self.custom_image_info = d.get('custom_image_info')
 
 		self.width = d.get('width', global_spec.width)
 		self.height = d.get('height', global_spec.height)

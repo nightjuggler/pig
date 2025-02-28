@@ -207,6 +207,14 @@ def toStrAltitude(value):
 	(n, d), = value
 	return f'{n}/{d} ({n/d:.1f} meters)'
 
+def toStrCompositeExposureTimes(value, p=3):
+	assert len(value) == 58
+	values = [f'{n/d:.{p}f}'.rstrip('.0') or '0' for n, d in exifReadRational(value, 0, 7)]
+	m, = exifReadShort(value, 7*8, 1)
+	assert m == 0
+	values.append(str(m))
+	return ', '.join(values)
+
 exifIFD0 = ExifTagInfo('IFD0', subIFD={
 	270: ExifTagInfo('ImageDescription'),
 	271: ExifTagInfo('Make'),
@@ -293,7 +301,7 @@ exifIFD0 = ExifTagInfo('IFD0', subIFD={
 		42037: ExifTagInfo('LensSerialNumber'),
 		42080: ExifTagInfo('CompositeImage'),
 		42081: ExifTagInfo('SourceImageNumberOfCompositeImage'),
-		42082: ExifTagInfo('SourceExposureTimesOfCompositeImage'),
+		42082: ExifTagInfo('SourceExposureTimesOfCompositeImage', toStr=toStrCompositeExposureTimes),
 	}),
 	34853: ExifTagInfo('GPS IFD', subIFD={
 		0: ExifTagInfo('GPSVersionID', toStr=lambda v: '.'.join([str(i) for i in v])),
