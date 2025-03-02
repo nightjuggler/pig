@@ -143,8 +143,7 @@ def create_image_pages(images, options):
 		image.number = image_number
 		image.page = page_path(image_number)
 		template_vars = {
-			'date': global_spec.date,
-			'title': global_spec.title,
+			'spec': global_spec,
 			'image': image,
 			'num_images': num_images,
 			'half_width': image.width // 2,
@@ -255,8 +254,7 @@ def create_thumb_pages(pages, options):
 
 	for page, table in enumerate(pages, start=1):
 		template_vars = {
-			'date': global_spec.date,
-			'title': global_spec.title,
+			'spec': global_spec,
 			'table': table,
 			'fit': fit,
 		}
