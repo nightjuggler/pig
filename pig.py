@@ -97,7 +97,7 @@ class ImageInfo(object):
 		make = get_str(271)
 		model = get_str(272)
 		if not (make and model): return
-		self.camera = f'{make} {model}'
+		self.camera = model if model.startswith(make) else f'{make} {model}'
 		info = [self.camera]
 		if d := d.get(34665):
 			d = d.value
