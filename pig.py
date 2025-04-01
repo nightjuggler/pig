@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 import operator
 import os
 import subprocess
@@ -170,26 +171,26 @@ def create_image_pages(images, options):
 			with open(image.page, 'w') as file:
 				template.write(file, template_vars)
 
-def fit_sizes1(max_width, sizes):
+def fit_sizes1(row_width, sizes):
 	((w, h), images), = sizes
-	new_w = round(max_width / len(images))
+	new_w = round(row_width / len(images))
 	new_h = round(new_w * h/w)
 	for image in images:
 		image.thumb_width, image.thumb_height = new_w, new_h
 
-def fit_sizes2(max_width, sizes):
+def fit_sizes2(row_width, sizes):
 	((w1, h1), images1), ((w2, h2), images2) = sizes
 	n1 = len(images1)
 	n2 = len(images2)
 
-	# (1) n1*(w1+d1) + n2*(w2+d2) = max_width
+	# (1) n1*(w1+d1) + n2*(w2+d2) = row_width
 	# (2) (w1+d1)*h1/w1 = (w2+d2)*h2/w2
 
-	# w2+d2 = (max_width - n1*(w1+d1)) / n2
-	# w1+d1 = max_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
+	# w2+d2 = (row_width - n1*(w1+d1)) / n2
+	# w1+d1 = row_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
 
-	new_w1 = max_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
-	new_w2 = (max_width - n1*new_w1) / n2
+	new_w1 = row_width*w1*h2 / (n1*w1*h2 + n2*w2*h1)
+	new_w2 = (row_width - n1*new_w1) / n2
 
 	new_w1 = round(new_w1)
 	new_h1 = round(new_w1 * h1/w1)
@@ -202,24 +203,33 @@ def fit_sizes2(max_width, sizes):
 		image.thumb_width, image.thumb_height = new_w2, new_h2
 
 def calculate_fitted_sizes(pages):
+	sizemap = defaultdict(list)
 	for page_num, table in enumerate(pages, start=1):
-		max_width = max(sum(image.thumb_width for image in row if image) for row in table)
+		max_widths = {}
+		row_width = max(sum(image.thumb_width for image in row) for row in table)
+		last_row = table[-1]
 		for row_num, row in enumerate(table, start=1):
-			sizes = {}
 			for image in row:
-				size = image.thumb_width, image.thumb_height
-				sizes.setdefault(size, []).append(image)
-			sizes = sorted(sizes.items())
+				sizemap[image.thumb_width, image.thumb_height].append(image)
+			sizes = sorted(sizemap.items())
+			if row is last_row and len(row) < global_spec.thumb_cols:
+				row_width = min(row_width, sum(len(images) * max_widths.get(size, size[0])
+					for size, images in sizes))
 			if len(sizes) == 2:
-				fit_sizes2(max_width, sizes)
+				fit_sizes2(row_width, sizes)
 			elif len(sizes) == 1:
-				fit_sizes1(max_width, sizes)
+				fit_sizes1(row_width, sizes)
 			else:
 				sizes = [f'{w}x{h} [{len(images)}]' for (w, h), images in sizes]
 				sizes = ', '.join(sizes[:-1]) + ', and ' + sizes[-1]
 				print('Cannot calculate fitted sizes for thumbs on '
 					f'page {page_num}, row {row_num}!\n'
 					f'More than two different sizes: {sizes}')
+			for size, images in sizemap.items():
+				w = images[0].thumb_width
+				if w > max_widths.get(size, 0):
+					max_widths[size] = w
+			sizemap.clear()
 
 def prep_thumb_pages(images, fit):
 	thumb_cols = global_spec.thumb_cols
