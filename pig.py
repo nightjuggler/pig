@@ -9,6 +9,7 @@ from pimly import Image
 import spec as global_spec
 import temple
 
+magick = getattr(global_spec, 'magick', '/usr/local/bin/magick')
 def page_path(n): return f'page{n:03}.html'
 def index_path(n): return 'index.html' if n == 1 else f'index{n:02}.html'
 
@@ -287,7 +288,7 @@ def mkdir(name):
 		os.mkdir(name)
 
 def convert(in_path, out_path, conversions):
-	command = ['/usr/local/bin/magick', in_path, *conversions, out_path]
+	command = [magick, in_path, *conversions, out_path]
 	print(*command)
 	subprocess.run(command)
 
