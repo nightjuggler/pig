@@ -3,16 +3,18 @@ import os.path
 import sys
 
 def main():
+	prefix = 'IMG_'
 	time_name_pairs = [(os.stat(name).st_mtime, name) for name in os.listdir('.')
-		if name[:4] == 'IMG_' and name[-4:] == '.JPG']
+		if name.startswith(prefix) and name.endswith(('.HEIC', '.JPG'))]
 	time_name_pairs.sort()
 
 	names = []
 	for i, (mtime, oldname) in enumerate(time_name_pairs, start=1):
-		newname = 'IMG_{:04d}.JPG'.format(i)
+		ext = oldname[oldname.rfind('.'):]
+		newname = f'{prefix}{i:04}{ext}'
 		tmpname = 'tmp_' + newname
 		if os.path.exists(tmpname):
-			sys.exit('"{}" already exists!'.format(tmpname))
+			sys.exit(f'"{tmpname}" already exists!')
 		names.append((oldname, tmpname, newname))
 
 	for oldname, tmpname, newname in names:
@@ -21,7 +23,7 @@ def main():
 
 	for oldname, tmpname, newname in names:
 		if os.path.exists(newname):
-			sys.exit('"{}" already exists!'.format(newname))
+			sys.exit(f'"{newname}" already exists!')
 		print('Renaming', tmpname, 'to', newname)
 		os.rename(tmpname, newname)
 
