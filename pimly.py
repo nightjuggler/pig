@@ -29,6 +29,9 @@ class LittleEndian(object):
 	def int4(b, i=0):
 		return b[i] + (b[i+1]<<8) + (b[i+2]<<16) + (b[i+3]<<24)
 	@staticmethod
+	def int3(b, i=0):
+		return b[i] + (b[i+1]<<8) + (b[i+2]<<16)
+	@staticmethod
 	def int2(b, i=0):
 		return b[i] + (b[i+1]<<8)
 	@staticmethod
@@ -489,6 +492,18 @@ def jpegReadSegments(image, f):
 		f.seek(segmentLength, 1)
 		b = f.read(2)
 
+def webpReadHeader(image, hdr, f):
+	E = LittleEndian
+	b = f.read(14)
+	if hdr == b'VP8 ':
+		# https://www.rfc-editor.org/rfc/rfc6386.html#section-9
+		assert b[7:10] == b'\x9d\x01\x2a'
+		image.size = E.int2(b, 10) & 0x3fff, E.int2(b, 12) & 0x3fff
+	elif hdr == b'VP8X':
+		# https://www.rfc-editor.org/rfc/rfc9649.html#section-2.7
+		assert E.int4(b) == 10
+		image.size = E.int3(b, 8) + 1, E.int3(b, 11) + 1
+
 class Image(object):
 	xmpEndOfLine = re.compile(' *\\n *')
 	xmpDateCreated = re.compile('<{0}>({1}-{2}-{2}T{2}:{2}:{2})</{0}>'.format(
@@ -510,6 +525,9 @@ class Image(object):
 
 			elif b[:8] == b'\x89PNG\r\n\x1A\n':
 				pngReadHeader(self, b[8:], f)
+
+			elif b[:4] == b'RIFF' and b[8:12] == b'WEBP':
+				webpReadHeader(self, b[12:16], f)
 
 	def getTimeCreated(self):
 		if self.xmpData is not None:
