@@ -3,6 +3,7 @@ from collections import defaultdict
 import operator
 import os
 import subprocess
+import sys
 import time
 
 from pimly import Image
@@ -10,6 +11,21 @@ import spec as global_spec
 import temple
 
 magick = getattr(global_spec, 'magick', '/usr/local/bin/magick')
+identify = getattr(global_spec, 'identify', [magick, 'identify'])
+
+def get_image_size(image_path):
+	size = Image(image_path).size
+	if size: return size
+
+	result = subprocess.run([*identify, image_path], capture_output=True, text=True)
+	if result.returncode:
+		sys.exit(f'"{" ".join(result.args)}" returncode={result.returncode}')
+
+	result = result.stdout.split()
+	assert len(result) == 9 and result[0] == image_path and result[1] == 'WEBP'
+	width, height = result[2].split('x')
+	return int(width), int(height)
+
 def page_path(n): return f'page{n:03}.html'
 def index_path(n): return 'index.html' if n == 1 else f'index{n:02}.html'
 
@@ -18,7 +34,7 @@ def format_ar(kind, aspect_ratio):
 
 def check_ar(name, kind1, ar1, kind2, ar2):
 	if ar1 != ar2:
-		print(format_ar(kind1, ar1), 'for "{}" not equal to'.format(name), format_ar(kind2, ar2))
+		print(f'{format_ar(kind1, ar1)} for "{name}" not equal to {format_ar(kind2, ar2)}')
 
 def format_time(timestamp):
 	year, month, day, hour, minute = time.localtime(timestamp)[:5]
@@ -48,14 +64,14 @@ def get_dimensions(spec_height, ar_width, ar_height):
 
 class ImageInfo(object):
 	images = []
-	def __init__(self, name, spec, dir_spec):
+	def __init__(self, name, spec, dir_spec, info_path, web_path):
 		self.name = name
+		self.web_originals, self.web_name = os.path.split(web_path)
 		self.spec = spec
 		self.dir = dir_spec
 
-		path = os.path.join(dir_spec.originals, name)
-		stat = os.stat(path)
-		image = Image(path)
+		stat = os.stat(web_path)
+		image = Image(info_path)
 		width, height = image.size
 
 		self.size_px = f'{width}x{height}'
@@ -76,7 +92,7 @@ class ImageInfo(object):
 			self.width, self.height = get_dimensions(spec.height, *aspect_ratio)
 			self.thumb_width, self.thumb_height = get_dimensions(spec.thumb_height, *aspect_ratio)
 
-		check_ar(path, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
+		check_ar(info_path, 'Image', aspect_ratio, 'spec', spec.aspect_ratio)
 		self.resize_width = self.width
 		self.process_exif(image.exifData)
 		if spec.custom_image_info:
@@ -308,8 +324,8 @@ def create_album(images, options):
 		spec = image.spec
 
 		original_path = os.path.join(image.dir.originals, name)
-		image_path = os.path.join(image.dir.images, name)
-		thumb_path = os.path.join(image.dir.thumbs, name)
+		image_path = os.path.join(image.dir.images, image.web_name)
+		thumb_path = os.path.join(image.dir.thumbs, image.web_name)
 
 		conversions = ['-strip']
 		if pre_convert := spec.pre_convert.get(name):
@@ -327,7 +343,7 @@ def create_album(images, options):
 		if not os.path.exists(image_path) and create_images:
 			convert(original_path, image_path, conversions)
 		if os.path.exists(image_path):
-			size = Image(image_path).size
+			size = get_image_size(image_path)
 			if size != (image.width, image.height):
 				print('Changing size for {} from {}x{} to {}x{}'.format(image_path,
 					image.width, image.height, *size))
@@ -336,7 +352,7 @@ def create_album(images, options):
 		if not os.path.exists(thumb_path) and create_thumbs:
 			convert(image_path, thumb_path, ['-strip', '-resize', str(image.thumb_width)])
 		if os.path.exists(thumb_path):
-			size = Image(thumb_path).size
+			size = get_image_size(thumb_path)
 			if size != (image.thumb_width, image.thumb_height):
 				print('Changing size for {} from {}x{} to {}x{}'.format(thumb_path,
 					image.thumb_width, image.thumb_height, *size))
@@ -372,7 +388,15 @@ def add_images(d):
 	originals = dir_spec.originals
 	spec = SharedSpec(d)
 	skip = frozenset(d.get('skip', ()))
-	convert_list = []
+	ext_map = {
+		'.HEIC': ('.JPG', '.webp'),
+		'.PNG' : ('.PNG', '.webp'),
+		'.png' : ('.png', '.webp'),
+		'.JPG' : ('.JPG', '.JPG' ),
+		'.jpg' : ('.jpg', '.jpg' ),
+	}
+	info_dir = originals + '_info'
+	web_dir = originals + '_web'
 
 	spec.aspect_ratio = get_aspect_ratio(spec.width, spec.height)
 	thumb_aspect_ratio = get_aspect_ratio(spec.thumb_width, spec.thumb_height)
@@ -388,52 +412,79 @@ def add_images(d):
 
 	rotate_info = {name: rotate_value
 		for attr, rotate_value in (
-			('rotate_left', ('-90', True)),
-			('rotate_right', ('90', True)),
-			('rotate_180', ('180', False)))
+			('rotate_left', '-90'),
+			('rotate_right', '90'),
+			('rotate_180', '180'))
 				for name in d.get(attr, ())}
 
-	def add_image(name, orig_name):
-		image = ImageInfo(name, spec, dir_spec)
-		image.rotate, rotate90 = rotate_info.get(orig_name, (None, False))
-		if rotate90:
-			image.rotate90()
+	def add_image(name, parent, info_path, web_path):
+		image = ImageInfo(name, spec, dir_spec, info_path, web_path)
+		image.rotate = rotate_info.get(parent)
+		if image.rotate in ('-90', '90'): image.rotate90()
+
+	def convert_orig(original, conversions, new_paths):
+		stat = os.stat(original)
+		times = stat.st_atime_ns, stat.st_mtime_ns
+		for new_path in new_paths:
+			if not os.path.exists(new_path):
+				convert(original, new_path, conversions)
+				os.utime(new_path, ns=times)
 
 	for name in sorted(os.listdir(originals)):
 		if name in skip:
 			continue
-		elif name.endswith('.HEIC'):
-			convert_list.append(name)
-		elif name.endswith(('.JPG', '.jpg', '.PNG', '.png')):
-			add_image(name, name)
-
-	def convert_orig(name, suffix, conversions):
-		new_name = os.path.splitext(name)[0] + suffix + '.JPG'
-		new_path = os.path.join(dir_spec.originals, new_name)
-		if not os.path.exists(new_path):
-			path = os.path.join(originals, name)
-			stat = os.stat(path)
-			convert(path, new_path, conversions)
-			os.utime(new_path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
-		add_image(new_name, name)
-
-	if convert_list:
-		dir_spec = DirSpec(dir_suffix)
-		dir_spec.originals += '_converted'
-		mkdir(dir_spec.originals)
-
-		for name in convert_list:
-			convert_orig(name, '', [])
+		original = os.path.join(originals, name)
+		basename, extension = os.path.splitext(name)
+		info_ext, web_ext = ext_map.get(extension, (None, None))
+		if not info_ext:
+			print('Skipping', original)
+			continue
+		convert_paths = []
+		if extension == web_ext:
+			web_path = original
+		else:
+			web_path = os.path.join(web_dir, basename + web_ext)
+			convert_paths.append(web_path)
+			mkdir(web_dir)
+		if extension == info_ext:
+			info_path = original
+		elif info_ext == web_ext:
+			info_path = web_path
+		else:
+			info_path = os.path.join(info_dir, basename + info_ext)
+			convert_paths.append(info_path)
+			mkdir(info_dir)
+		if convert_paths:
+			convert_orig(original, [], convert_paths)
+		add_image(name, name, info_path, web_path)
 
 	if crop_list := d.get('crop'):
 		dir_spec = DirSpec(dir_suffix + '_cropped')
-		mkdir(dir_spec.originals)
+		crop_dir = dir_spec.originals
+		web_dir = dir_spec.originals + '_web'
+		mkdir(crop_dir)
 
 		crop_count_map = {}
 		for name, geometry in crop_list:
-			crop_count = crop_count_map.get(name, 1)
-			crop_count_map[name] = crop_count + 1
-			convert_orig(name, f'_{crop_count}', ['-crop', geometry])
+			original = os.path.join(originals, name)
+			basename, extension = os.path.splitext(name)
+			info_ext, web_ext = ext_map.get(extension, (None, None))
+			if not info_ext:
+				print('Skipping', original, '-crop', geometry)
+				continue
+			crop_count_map[name] = crop_count = crop_count_map.get(name, 0) + 1
+			basename = f'{basename}_{crop_count}'
+			crop_name = basename + info_ext
+			crop_path = os.path.join(crop_dir, crop_name)
+			convert_paths = [crop_path]
+			if web_ext == info_ext:
+				web_path = crop_path
+			else:
+				web_path = os.path.join(web_dir, basename + web_ext)
+				convert_paths.append(web_path)
+				mkdir(web_dir)
+			convert_orig(original, ['-crop', geometry], convert_paths)
+			add_image(crop_name, name, crop_path, web_path)
 
 def get_options():
 	parser = argparse.ArgumentParser(allow_abbrev=False)

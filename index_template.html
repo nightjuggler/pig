@@ -44,14 +44,14 @@ a {text-decoration: none;}
 </style>
 </head>
 <body>
-<div class="title"><?spec.title><br>(<?spec.date>)</div><?if spec.overview>
+<div class="title"><?spec.title> (<?spec.date>)</div><?if spec.overview>
 <a href="<?spec.overview>"><div class="button">Back to Overview</div></a><?end>
 <?if fit>
-<?for row in table><div class="photos"><?for image in row><?if image><a href="<?image.page>"><img id="p<?image.number>" src="<?image.dir.thumbs>/<?image.name>" width="<?image.thumb_width>" height="<?image.thumb_height>" loading="lazy" /></a><?end><?end></div>
+<?for row in table><div class="photos"><?for image in row><?if image><a href="<?image.page>"><img id="p<?image.number>" src="<?image.dir.thumbs>/<?image.web_name>" width="<?image.thumb_width>" height="<?image.thumb_height>" loading="lazy" /></a><?end><?end></div>
 <?end><?else>
 <table class="photos">
 <?for row in table><tr>
-<?for image in row><td><?if image><a href="<?image.page>"><img id="p<?image.number>" src="<?image.dir.thumbs>/<?image.name>" width="<?image.thumb_width>" height="<?image.thumb_height>" loading="lazy" /></a><?else>&nbsp;<?end></td>
+<?for image in row><td><?if image><a href="<?image.page>"><img id="p<?image.number>" src="<?image.dir.thumbs>/<?image.web_name>" width="<?image.thumb_width>" height="<?image.thumb_height>" loading="lazy" /></a><?else>&nbsp;<?end></td>
 <?end></tr>
 <?end></table>
 <?end><?if number>

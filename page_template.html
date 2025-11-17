@@ -48,19 +48,17 @@ a {text-decoration: none;}
 <area shape="default" href="<?next_page>" />
 </map>
 
-<b><a href="<?image.index_page>#p<?image.number>"><?spec.title></a><br>(<?spec.date>)</b><br>
-<img id="photo" src="<?image.dir.images>/<?image.name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /><br>
+<b><a href="<?image.index_page>#p<?image.number>"><?spec.title></a> (<?spec.date>)</b><br>
+<img id="photo" src="<?image.dir.images>/<?image.web_name>" width="<?image.width>" height="<?image.height>" usemap="#imgmap" /><br>
 <?if caption><div class="caption"><?caption></div>
 <?end><?if prev_link><?if first_page><a href="<?first_page>"><div class="button">First</div></a>
 <?end><a href="<?prev_page>"><div class="button">Previous</div></a>
 <?end><?image.number>/<?num_images><?if next_link>
 <a href="<?next_page>"><div class="button">Next</div></a><?if last_page>
 <a href="<?last_page>"><div class="button">Last</div></a><?end><?end><br>
-<div class="info"><?if image.link_orig><?image.name>
-<a href="<?image.dir.originals>/<?image.name>"><div class="button">&nbsp;<?image.size_px>, <?image.size_mb>&nbsp;</div></a><?if image.time>
-<?image.time><?end><?else><a href="<?image.dir.images>/<?image.name>"><div class="button">&nbsp;<?image.name>&nbsp;</div></a>
+<div class="info"><a href="<?image.web_originals>/<?image.web_name>"><div class="button">&nbsp;<?image.web_name>&nbsp;</div></a>
 <?image.size_px>, <?image.size_mb><?if image.time>,
-<?image.time><?end><?end></div><?if image.camera>
+<?image.time><?end></div><?if image.camera>
 <div class="camera"><?image.camera_info></div><?end>
 
 </body>
