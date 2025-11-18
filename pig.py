@@ -19,7 +19,7 @@ def get_image_size(image_path):
 
 	result = subprocess.run([*identify, image_path], capture_output=True, text=True)
 	if result.returncode:
-		sys.exit(f'"{" ".join(result.args)}" returncode={result.returncode}')
+		sys.exit(f'{" ".join(result.args)} => {result.returncode}')
 
 	result = result.stdout.split()
 	assert len(result) == 9 and result[0] == image_path and result[1] == 'WEBP'
@@ -64,8 +64,9 @@ def get_dimensions(spec_height, ar_width, ar_height):
 
 class ImageInfo(object):
 	images = []
-	def __init__(self, name, spec, dir_spec, info_path, web_path):
+	def __init__(self, name, spec, dir_spec, original, info_path, web_path, geometry=None):
 		self.name = name
+		self.original = original
 		self.web_originals, self.web_name = os.path.split(web_path)
 		self.spec = spec
 		self.dir = dir_spec
@@ -97,11 +98,12 @@ class ImageInfo(object):
 		self.process_exif(image.exifData)
 		if spec.custom_image_info:
 			spec.custom_image_info(self, image)
+		self.rotate = spec.rotate.get(os.path.basename(original))
+		if self.rotate in ('-90', '90'):
+			self.width, self.height = self.height, self.width
+			self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
+		self.geometry = geometry
 		self.images.append(self)
-
-	def rotate90(self):
-		self.width, self.height = self.height, self.width
-		self.thumb_width, self.thumb_height = self.thumb_height, self.thumb_width
 
 	def process_exif(self, d):
 		self.camera = ''
@@ -322,12 +324,13 @@ def create_album(images, options):
 	for image in images:
 		name = image.name
 		spec = image.spec
-
-		original_path = os.path.join(image.dir.originals, name)
 		image_path = os.path.join(image.dir.images, image.web_name)
 		thumb_path = os.path.join(image.dir.thumbs, image.web_name)
 
 		conversions = ['-strip']
+		if image.geometry:
+			conversions.append('-crop')
+			conversions.append(image.geometry)
 		if pre_convert := spec.pre_convert.get(name):
 			conversions.append(pre_convert)
 		conversions.append('-resize')
@@ -341,7 +344,7 @@ def create_album(images, options):
 			conversions.append('-normalize')
 
 		if not os.path.exists(image_path) and create_images:
-			convert(original_path, image_path, conversions)
+			convert(image.original, image_path, conversions)
 		if os.path.exists(image_path):
 			size = get_image_size(image_path)
 			if size != (image.width, image.height):
@@ -382,6 +385,11 @@ class SharedSpec(object):
 		self.thumb_width = d.get('thumb_width', global_spec.thumb_width)
 		self.thumb_height = d.get('thumb_height', global_spec.thumb_height)
 
+		self.rotate = {name: value for attr, value in (
+			('rotate_left', '-90'),
+			('rotate_right', '90'),
+			('rotate_180', '180')) for name in d.get(attr, ())}
+
 def add_images(d):
 	dir_suffix = d.get('dir_suffix', '')
 	dir_spec = DirSpec(dir_suffix)
@@ -389,9 +397,9 @@ def add_images(d):
 	spec = SharedSpec(d)
 	skip = frozenset(d.get('skip', ()))
 	ext_map = {
-		'.HEIC': ('.JPG', '.webp'),
-		'.PNG' : ('.PNG', '.webp'),
-		'.png' : ('.png', '.webp'),
+		'.HEIC': ('.webp','.webp'),
+		'.PNG' : ('.webp','.webp'),
+		'.png' : ('.webp','.webp'),
 		'.JPG' : ('.JPG', '.JPG' ),
 		'.jpg' : ('.jpg', '.jpg' ),
 	}
@@ -409,18 +417,6 @@ def add_images(d):
 			print('Cannot parse time_adjust_cutoff for "{}"'.format(originals))
 			time_adjust_cutoff = 0
 	spec.time_adjust_cutoff = time_adjust_cutoff
-
-	rotate_info = {name: rotate_value
-		for attr, rotate_value in (
-			('rotate_left', '-90'),
-			('rotate_right', '90'),
-			('rotate_180', '180'))
-				for name in d.get(attr, ())}
-
-	def add_image(name, parent, info_path, web_path):
-		image = ImageInfo(name, spec, dir_spec, info_path, web_path)
-		image.rotate = rotate_info.get(parent)
-		if image.rotate in ('-90', '90'): image.rotate90()
 
 	def convert_orig(original, conversions, new_paths):
 		stat = os.stat(original)
@@ -456,13 +452,13 @@ def add_images(d):
 			mkdir(info_dir)
 		if convert_paths:
 			convert_orig(original, [], convert_paths)
-		add_image(name, name, info_path, web_path)
+		ImageInfo(name, spec, dir_spec, original, info_path, web_path)
 
 	if crop_list := d.get('crop'):
 		dir_spec = DirSpec(dir_suffix + '_cropped')
-		crop_dir = dir_spec.originals
-		web_dir = dir_spec.originals + '_web'
-		mkdir(crop_dir)
+		info_dir = dir_spec.originals + '_info'
+		web_dir = dir_spec.originals
+		mkdir(web_dir)
 
 		crop_count_map = {}
 		for name, geometry in crop_list:
@@ -475,16 +471,16 @@ def add_images(d):
 			crop_count_map[name] = crop_count = crop_count_map.get(name, 0) + 1
 			basename = f'{basename}_{crop_count}'
 			crop_name = basename + info_ext
-			crop_path = os.path.join(crop_dir, crop_name)
-			convert_paths = [crop_path]
-			if web_ext == info_ext:
-				web_path = crop_path
+			web_path = os.path.join(web_dir, basename + web_ext)
+			convert_paths = [web_path]
+			if info_ext == web_ext:
+				info_path = web_path
 			else:
-				web_path = os.path.join(web_dir, basename + web_ext)
-				convert_paths.append(web_path)
-				mkdir(web_dir)
+				info_path = os.path.join(info_dir, crop_name)
+				convert_paths.append(info_path)
+				mkdir(info_dir)
 			convert_orig(original, ['-crop', geometry], convert_paths)
-			add_image(crop_name, name, crop_path, web_path)
+			ImageInfo(crop_name, spec, dir_spec, original, info_path, web_path, geometry=geometry)
 
 def get_options():
 	parser = argparse.ArgumentParser(allow_abbrev=False)

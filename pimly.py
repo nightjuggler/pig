@@ -493,16 +493,30 @@ def jpegReadSegments(image, f):
 		b = f.read(2)
 
 def webpReadHeader(image, hdr, f):
-	E = LittleEndian
 	b = f.read(14)
 	if hdr == b'VP8 ':
 		# https://www.rfc-editor.org/rfc/rfc6386.html#section-9
+		int2 = LittleEndian.int2
 		assert b[7:10] == b'\x9d\x01\x2a'
-		image.size = E.int2(b, 10) & 0x3fff, E.int2(b, 12) & 0x3fff
+		image.size = int2(b, 10) & 0x3fff, int2(b, 12) & 0x3fff
 	elif hdr == b'VP8X':
 		# https://www.rfc-editor.org/rfc/rfc9649.html#section-2.7
-		assert E.int4(b) == 10
-		image.size = E.int3(b, 8) + 1, E.int3(b, 11) + 1
+		int4 = LittleEndian.int4
+		int3 = LittleEndian.int3
+		assert int4(b) == 10
+		image.size = int3(b, 8) + 1, int3(b, 11) + 1
+
+		while len(b := f.read(8)) == 8:
+			size = int4(b, 4)
+			if b[:4] == b'EXIF':
+				image.exifOffset = f.tell()
+				image.exifData = exifRead(f.read(size))
+				image.byteOrder = E
+			elif b[:4] == b'XMP ':
+				image.xmpData = f.read(size).decode()
+			else:
+				f.seek(size, 1)
+		assert b.strip(b'\x00') == b''
 
 class Image(object):
 	xmpEndOfLine = re.compile(' *\\n *')
@@ -529,18 +543,20 @@ class Image(object):
 			elif b[:4] == b'RIFF' and b[8:12] == b'WEBP':
 				webpReadHeader(self, b[12:16], f)
 
-	def getTimeCreated(self):
-		if self.xmpData is not None:
-			m = self.xmpDateCreated.search(self.xmpData)
-			if m is None:
-				return 0
-			try:
-				return time.mktime(time.strptime(m.group(1), '%Y-%m-%dT%H:%M:%S'))
-			except ValueError:
-				return 0
-
-		if self.exifData is None:
+	def getTimeCreatedXmp(self):
+		if not self.xmpData:
 			return 0
+		m = self.xmpDateCreated.search(self.xmpData)
+		if m is None:
+			return 0
+		try:
+			return time.mktime(time.strptime(m.group(1), '%Y-%m-%dT%H:%M:%S'))
+		except ValueError:
+			return 0
+
+	def getTimeCreated(self):
+		if not self.exifData:
+			return self.getTimeCreatedXmp()
 
 		exifSubIFD = self.exifData.get(34665)
 		if exifSubIFD is None:
@@ -549,31 +565,29 @@ class Image(object):
 		tagData = exifSubIFD.value.get(36867) # DateTimeOriginal, e.g. '2008:06:27 08:36:55'
 		if tagData is None:
 			return 0
-
 		try:
 			return time.mktime(time.strptime(tagData.value, '%Y:%m:%d %H:%M:%S'))
 		except ValueError:
 			return 0
 
 	def printExif(self, oneLine=False):
-		if self.exifData is not None:
-			if oneLine:
-				print(self.fileName, end=',')
-				print('ByteOrder', self.byteOrder.name, sep='=', end=',')
-			else:
-				print('FileName', self.fileName, sep=': ')
-				print('ByteOrder', self.byteOrder.name, sep=': ')
-
-			exifPrintSorted(self.exifData, oneLine=oneLine)
+		if not self.exifData: return
+		if oneLine:
+			print(self.fileName, end=',')
+			print('ByteOrder', self.byteOrder.name, sep='=', end=',')
+		else:
+			print('FileName', self.fileName, sep=': ')
+			print('ByteOrder', self.byteOrder.name, sep=': ')
+		exifPrintSorted(self.exifData, oneLine=oneLine)
 
 	def printXMP(self, oneLine=False):
-		if self.xmpData is not None:
-			if oneLine:
-				print(self.fileName, end=',')
-				print(self.xmpEndOfLine.sub(' ', self.xmpData))
-			else:
-				print('FileName', self.fileName, sep=': ')
-				print(self.xmpData)
+		if not self.xmpData: return
+		if oneLine:
+			print(self.fileName, end=',')
+			print(self.xmpEndOfLine.sub(' ', self.xmpData))
+		else:
+			print('\nFileName', self.fileName, sep=': ')
+			print(self.xmpData)
 
 def setOrientation(image, args):
 	if image.exifData is None:
@@ -624,10 +638,9 @@ def setOrientation(image, args):
 	print('Done')
 
 def printExif(image, args):
-	if image.xmpData:
-		image.printXMP(oneLine=args.one_line)
-	else:
-		image.printExif(oneLine=args.one_line)
+	oneLine = args.one_line
+	image.printExif(oneLine)
+	image.printXMP(oneLine)
 
 def main():
 	import argparse
