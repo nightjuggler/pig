@@ -2,7 +2,7 @@ import os
 
 def writeCropList(imageDir):
 	imageNames = sorted(name for name in os.listdir(imageDir)
-		if name.endswith(('.JPG', '.jpg', '.PNG', '.png')))
+		if name.endswith(('.webp', '.PNG', '.png', '.JPG', '.jpg')))
 	with open('cropList.js', 'w') as f:
 		f.write('var showCropGeometry = true;\n')
 		f.write(f'var imagePath = "{imageDir}/";\n')
@@ -13,7 +13,7 @@ def writeCropList(imageDir):
 if __name__ == '__main__':
 	import argparse
 	parser = argparse.ArgumentParser()
-	parser.add_argument('imageDir', nargs='?', default='originals')
+	parser.add_argument('imageDir', nargs='?', default='originals_web')
 	args = parser.parse_args()
 
 	writeCropList(args.imageDir)
