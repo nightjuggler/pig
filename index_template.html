@@ -2,13 +2,15 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title><?spec.title> (<?spec.date>)<?if number> <?number><?end></title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title><?spec.title><?if spec.date> (<?spec.date>)<?end><?if number> <?number><?end></title>
 <style>
 body {
 	background-color: white;
 	font-family: verdana;
 	font-size: 14pt;
 	text-align: center;
+	margin: 0;
 }
 .button {
 	background-color: rgb(240,240,240);
@@ -25,17 +27,19 @@ body {
 }
 img {
 	border: 2px solid black;
+	height: auto;
 	margin: 2px;
 	vertical-align: middle;
 }
 .title {
 	font-weight: bold;
-	margin-bottom: 4px;
+	margin: 4px auto;
 }
 .photos {
 	margin-left: auto;
 	margin-right: auto;<?if fit>
 	width: max-content;<?end>
+	max-width: 100%;
 }<?if number>
 .pager {
 	margin-top: 4px;
@@ -44,7 +48,7 @@ a {text-decoration: none;}
 </style>
 </head>
 <body>
-<div class="title"><?spec.title> (<?spec.date>)</div><?if spec.overview>
+<div class="title"><?spec.title><?if spec.date> (<?spec.date>)<?end></div><?if spec.overview>
 <a href="<?spec.overview>"><div class="button">Back to Overview</div></a><?end>
 <?if fit>
 <?for row in table><div class="photos"><?for image in row><?if image><a href="<?image.page>"><img id="p<?image.number>" src="<?image.dir.thumbs>/<?image.web_name>" width="<?image.thumb_width>" height="<?image.thumb_height>" loading="lazy" /></a><?end><?end></div>
