@@ -48,7 +48,7 @@ def format_time(timestamp):
 		if hour > 12:
 			hour -= 12
 
-	return f'{month}-{day}-{year%100:02} {hour}:{minute:02}{suffix}'
+	return f'{month}/{day}/{year%100:02} {hour}:{minute:02}{suffix}'
 
 def get_greatest_common_divisor(a, b):
 	while b:
@@ -108,11 +108,18 @@ class ImageInfo(object):
 	def process_exif(self, d):
 		self.camera = ''
 		self.camera_info = ''
+		self.orientation = 0
 		if not d: return
 
 		def get_str(key):
 			v = d.get(key)
 			return v.valueType.toStr(v.value) if v else None
+
+		def get_int(key, default=None):
+			v = d.get(key)
+			return v.value[0] if v else default
+
+		self.orientation = get_int(274, 0) # Orientation (short)
 
 		make = get_str(271)
 		model = get_str(272)
@@ -362,6 +369,11 @@ def create_album(images, options):
 				print('Changing size for {} from {}x{} to {}x{}'.format(thumb_path,
 					image.thumb_width, image.thumb_height, *size))
 				image.thumb_width, image.thumb_height = size
+
+		if image.orientation > 4:
+			image.width, image.height = image.height, image.width
+			image.thumb_width, image.thumb_height = image.thumb_height, image.thumb_width
+			image.size_px = 'x'.join(image.size_px.split('x')[::-1])
 
 	create_image_pages(images, options)
 	create_thumb_pages(thumb_pages, options)
