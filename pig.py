@@ -310,6 +310,9 @@ def convert(in_path, out_path, conversions):
 	print(*command)
 	subprocess.run(command)
 
+def resize_args(width):
+	return ['-resize', str(width), '-unsharp', '0x0.8+0.8+0.008']
+
 def create_album(images, options):
 	thumb_pages = prep_thumb_pages(images, options.fit)
 
@@ -327,19 +330,18 @@ def create_album(images, options):
 		image_path = os.path.join(image.dir.images, image.web_name)
 		thumb_path = os.path.join(image.dir.thumbs, image.web_name)
 
-		conversions = ['-strip']
+		conversions = []
 		if image.geometry:
 			conversions.append('-crop')
 			conversions.append(image.geometry)
 		if pre_convert := spec.pre_convert.get(name):
-			conversions.append(pre_convert)
-		conversions.append('-resize')
-		conversions.append(str(image.resize_width))
+			conversions.extend(pre_convert)
+		conversions.extend(resize_args(image.resize_width))
 		if image.rotate:
 			conversions.append('-rotate')
 			conversions.append(image.rotate)
 		if post_convert := spec.post_convert.get(name):
-			conversions.append(post_convert)
+			conversions.extend(post_convert)
 		if normalize_all or name in spec.normalize:
 			conversions.append('-normalize')
 
@@ -353,7 +355,7 @@ def create_album(images, options):
 				image.width, image.height = size
 
 		if not os.path.exists(thumb_path) and create_thumbs:
-			convert(image_path, thumb_path, ['-strip', '-resize', str(image.thumb_width)])
+			convert(image_path, thumb_path, resize_args(image.thumb_width))
 		if os.path.exists(thumb_path):
 			size = get_image_size(thumb_path)
 			if size != (image.thumb_width, image.thumb_height):
