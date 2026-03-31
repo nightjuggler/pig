@@ -2,6 +2,7 @@ import argparse
 from collections import defaultdict
 import operator
 import os
+from stat import S_IRUSR, S_IRGRP, S_IROTH, S_IWUSR
 import subprocess
 import sys
 import time
@@ -12,6 +13,7 @@ import temple
 
 magick = getattr(global_spec, 'magick', '/usr/local/bin/magick')
 identify = getattr(global_spec, 'identify', [magick, 'identify'])
+magick_mode = getattr(global_spec, 'magick_mode', S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR) # 0o644
 
 def get_image_size(image_path):
 	size = Image(image_path).size
@@ -315,7 +317,10 @@ def mkdir(name):
 def convert(in_path, out_path, conversions):
 	command = [magick, in_path, *conversions, out_path]
 	print(*command)
-	subprocess.run(command)
+	result = subprocess.run(command)
+	if result.returncode:
+		sys.exit(f'Exit status {result.returncode}')
+	os.chmod(out_path, magick_mode)
 
 def resize_args(width):
 	return ['-resize', str(width), '-unsharp', '0x0.8+0.8+0.008']
