@@ -455,42 +455,57 @@ startOfFrameMarkers = (
 
 def jpegReadSegments(image, f):
 	beInt2 = BigEndian.int2
+	jpegType = None
 
 	f.seek(0) # Rewind to the beginning of the file
+	pos = 0
 
-	b = f.read(2)
-	while b:
+	while b := f.read(2):
 		assert b[0] == 0xFF
 		marker = b[1]
-		b = f.read(2)
+		pos += 2
 
 		if 0xD0 <= marker <= 0xD9:
 			# 0xD0 thru 0xD7 => restart (RSTm)
 			# 0xD8 => start of image (SOI)
 			# 0xD9 => end of image (EOI)
 			continue
+
+		segmentLength = beInt2(f.read(2)) - 2
+		pos += 2
+
 		if marker in startOfFrameMarkers:
 			b = f.read(6)
 			width = beInt2(b, 3)
 			height = beInt2(b, 1)
-			image.size = (width, height)
+			image.size = width, height
 			break
 
-		segmentLength = beInt2(b) - 2
-
 		if marker == 0xE1:
-			b = f.read(6)
-			segmentLength -= 6
-			if b == b'Exif\x00\x00':
-				image.exifOffset = f.tell()
-				b = f.read(segmentLength)
-				image.exifData = exifRead(b)
+			b = f.read(segmentLength)
+			if b[:6] != b'Exif\x00\x00':
+				print(f'{image.fileName} has a non-Exif APP1 segment at position {pos}!')
+			elif image.exifData:
+				print(f'{image.fileName} has another Exif APP1 segment at position {pos}!')
+			else:
+				jpegType = 'Exif'
+				image.exifOffset = pos + 6
+				image.exifData = exifRead(b[6:])
 				image.byteOrder = E
-				b = f.read(2)
-				continue
+		elif marker == 0xE0:
+			b = f.read(segmentLength)
+			if b[:5] != b'JFIF\x00':
+				print(f'{image.fileName} has a non-JFIF APP0 segment at position {pos}!')
+			elif pos != 6:
+				print(f'{image.fileName} has a JFIF APP0 segment at position {pos}!')
+			else:
+				jpegType = 'JFIF'
+		else:
+			f.seek(segmentLength, 1)
+		pos += segmentLength
 
-		f.seek(segmentLength, 1)
-		b = f.read(2)
+	if not jpegType:
+		print(f'{image.fileName} is a JPEG that is neither Exif nor JFIF!')
 
 def webpReadHeader(image, hdr, f):
 	b = f.read(14)
@@ -531,10 +546,7 @@ class Image(object):
 
 		with open(filename, 'rb') as f:
 			b = f.read(16)
-			if b[:4] == b'\xFF\xD8\xFF\xE1' and b[6:11] == b'Exif\x00':
-				jpegReadSegments(self, f)
-
-			elif b[:4] == b'\xFF\xD8\xFF\xE0' and b[6:11] == b'JFIF\x00':
+			if b[:2] == b'\xFF\xD8':
 				jpegReadSegments(self, f)
 
 			elif b[:8] == b'\x89PNG\r\n\x1A\n':
